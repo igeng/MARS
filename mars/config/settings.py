@@ -26,15 +26,12 @@ class MarsSettings(BaseSettings):
     ZHIPU_API_KEY: str = ""
 
     # ---- Model identifiers ----
-    QWEN_MODEL: str = "qwen-max"
-    QWEN_PLUS_MODEL: str = "qwen-plus"
-    QWEN_TURBO_MODEL: str = "qwen-turbo"
+    QWEN_MODEL: str = "qwen3.5-flash"
 
     DEEPSEEK_MODEL: str = "deepseek-chat"
     DEEPSEEK_CODER_MODEL: str = "deepseek-coder"
 
-    KIMI_MODEL: str = "moonshot-v1-8k"
-    KIMI_LONG_MODEL: str = "moonshot-v1-128k"
+    KIMI_MODEL: str = "kimi-k2.5"
 
     GLM_MODEL: str = "glm-4-plus"
     GLM_AIR_MODEL: str = "glm-4-air"
