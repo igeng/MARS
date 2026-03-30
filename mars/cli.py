@@ -13,11 +13,25 @@ Usage:
 
 from __future__ import annotations
 
+import sys
+
 import typer
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
+
+# On Windows the default console encoding is often GBK/cp936, which cannot
+# encode emoji and other Unicode characters outside its range, raising
+# UnicodeEncodeError.  Reconfigure stdout/stderr to UTF-8 (with replacement
+# for any remaining unencodable bytes) so that Rich can render the banner
+# and all output without crashing.  The `hasattr` guard makes this safe on
+# non-CPython runtimes where `reconfigure` may be absent.
+if sys.platform == "win32":
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    if hasattr(sys.stderr, "reconfigure"):
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
 app = typer.Typer(
     name="mars",
