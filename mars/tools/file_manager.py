@@ -8,8 +8,10 @@ Handles reading and writing of research output files
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Optional
 
 from crewai.tools import BaseTool
+from pydantic import BaseModel, Field
 
 from mars.config import settings
 
@@ -18,6 +20,12 @@ def _ensure_output_dir() -> Path:
     out = settings.OUTPUT_DIR
     out.mkdir(parents=True, exist_ok=True)
     return out
+
+
+class FileWriterToolSchema(BaseModel):
+    filename: str
+    content: str
+    mode: Optional[str] = Field(default="w", description="File open mode: 'w' (overwrite) or 'a' (append). Default is 'w'.")
 
 
 class FileWriterTool(BaseTool):
@@ -31,6 +39,7 @@ class FileWriterTool(BaseTool):
         "'mode' (optional, 'w' or 'a', default 'w'). "
         "Returns the absolute path of the written file."
     )
+    args_schema: type[BaseModel] = FileWriterToolSchema
 
     def _run(self, filename: str, content: str, mode: str = "w") -> str:
         if not filename:
