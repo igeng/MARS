@@ -8,6 +8,7 @@ Semantic Scholar API and builds a NetworkX graph for analysis.
 from __future__ import annotations
 
 import json
+import logging
 from typing import Any
 
 import requests
@@ -15,6 +16,8 @@ from crewai.tools import BaseTool
 
 from mars.config import settings
 from mars.utils.retry import retry_on_network_error
+
+logger = logging.getLogger(__name__)
 
 SS_PAPER_URL = "https://api.semanticscholar.org/graph/v1/paper/{paper_id}"
 SS_REFS_FIELDS = "references.paperId,references.title,references.year,references.citationCount"
@@ -70,6 +73,7 @@ class CitationNetworkTool(BaseTool):
                 )
                 data = resp.json()
             except requests.RequestException as exc:
+                logger.warning("Failed to fetch paper '%s' from Semantic Scholar: %s", pid, exc)
                 continue
 
             nodes[pid] = {

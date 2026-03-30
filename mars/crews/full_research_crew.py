@@ -54,7 +54,7 @@ def create_full_research_crew(topic: str) -> Crew:
     # ---- Sequential phase 1: Domain analysis ----
     domain_analysis_task = create_domain_analysis_task(researcher, topic)
 
-    # ---- Sequential phase 1: Bulk paper retrieval ----
+    # ---- Sequential phase 2: Bulk paper retrieval ----
     bulk_search_task = create_paper_search_task(
         searcher, topic, max_papers, context=[domain_analysis_task]
     )
