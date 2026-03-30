@@ -13,6 +13,7 @@ from crewai import Crew, Process
 
 from mars.agents.connector import create_connector_agent
 from mars.agents.summarizer import create_summarizer_agent
+from mars.config import settings
 from mars.tasks.task_definitions import (
     create_connection_analysis_task,
     create_review_generation_task,
@@ -43,7 +44,7 @@ def create_connection_crew(papers_info: str, topic: str) -> Crew:
         tasks=[connection_analysis_task, review_generation_task],
         process=Process.sequential,
         verbose=True,
-        memory=True,
+        memory=settings.ENABLE_MEMORY,
     )
 
 
