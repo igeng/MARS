@@ -43,6 +43,7 @@ def create_connection_crew(papers_info: str, topic: str) -> Crew:
         tasks=[connection_analysis_task, review_generation_task],
         process=Process.sequential,
         verbose=True,
+        memory=True,
     )
 
 

@@ -38,6 +38,9 @@ class AnalyzeRequest(BaseModel):
     papers_info: str = Field(
         ..., min_length=1, description="论文信息（标题列表或描述）"
     )
+    topic: str = Field(
+        default="", description="研究主题（可选，提供时分析更有针对性）"
+    )
     max_papers: int = Field(
         default=20, gt=0, le=100, description="最大深度分析论文数量"
     )
@@ -135,7 +138,9 @@ def create_app() -> FastAPI:
     @app.post("/analyze", response_model=TaskResponse)
     def analyze_papers(req: AnalyzeRequest):
         from mars.crews.analysis_crew import run_analysis
-        result = run_analysis(req.papers_info, max_papers=req.max_papers)
+        result = run_analysis(
+            req.papers_info, topic=req.topic, max_papers=req.max_papers
+        )
         return TaskResponse(result=result)
 
     # ---- Connection ----

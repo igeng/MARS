@@ -203,6 +203,12 @@ class TestFastAPIApp:
         req = AnalyzeRequest(papers_info="paper1 | paper2")
         assert req.papers_info == "paper1 | paper2"
         assert req.max_papers == 20
+        assert req.topic == ""
+
+    def test_analyze_request_schema_with_topic(self) -> None:
+        from mars.api.main import AnalyzeRequest
+        req = AnalyzeRequest(papers_info="paper1", topic="federated learning")
+        assert req.topic == "federated learning"
 
     def test_full_research_request_schema(self) -> None:
         from mars.api.main import FullResearchRequest
@@ -244,3 +250,39 @@ class TestTaskDefinitions:
     def test_create_quality_evaluation_task(self) -> None:
         from mars.tasks.task_definitions import create_quality_evaluation_task
         assert callable(create_quality_evaluation_task)
+
+
+# ---------------------------------------------------------------------------
+# Code review fixes verification tests
+# ---------------------------------------------------------------------------
+
+class TestCodeReviewFixes:
+    def test_analysis_crew_accepts_topic(self) -> None:
+        """analysis_crew.create_analysis_crew should accept a topic arg."""
+        from mars.crews.analysis_crew import create_analysis_crew
+        import inspect
+        sig = inspect.signature(create_analysis_crew)
+        assert "topic" in sig.parameters
+
+    def test_analysis_crew_run_accepts_topic(self) -> None:
+        """run_analysis should accept a topic arg."""
+        from mars.crews.analysis_crew import run_analysis
+        import inspect
+        sig = inspect.signature(run_analysis)
+        assert "topic" in sig.parameters
+
+    def test_full_research_crew_uses_task_factory(self) -> None:
+        """full_research_crew should import create_review_generation_task."""
+        import mars.crews.full_research_crew as frc
+        assert hasattr(frc, "create_review_generation_task")
+
+    def test_conftest_output_dir_fixture_exists(self) -> None:
+        """conftest.py should provide an output_dir fixture."""
+        import tests.conftest as conftest
+        assert hasattr(conftest, "output_dir")
+        assert callable(conftest.output_dir)
+
+    def test_file_write_uses_output_dir_fixture(self, output_dir) -> None:
+        """Verify the conftest output_dir fixture works correctly."""
+        from mars.config import settings
+        assert settings.OUTPUT_DIR == output_dir

@@ -20,13 +20,18 @@ from mars.tasks.task_definitions import (
 )
 
 
-def create_analysis_crew(papers_info: str, max_papers: int | None = None) -> Crew:
+def create_analysis_crew(
+    papers_info: str,
+    topic: str = "",
+    max_papers: int | None = None,
+) -> Crew:
     """
     Build and return the Analysis Crew for a set of papers.
 
     Args:
         papers_info: Structured string describing papers to analyze
                      (titles, URLs, abstracts, etc.).
+        topic:       The research topic for contextual analysis.
         max_papers:  Maximum number of papers to deeply analyze.
     """
     limit = max_papers or settings.MAX_PAPERS_FOR_ANALYSIS
@@ -35,7 +40,7 @@ def create_analysis_crew(papers_info: str, max_papers: int | None = None) -> Cre
     evaluator = create_evaluator_agent()
 
     deep_analysis_task = create_deep_analysis_task(
-        analyzer, topic="", papers_info=papers_info, limit=limit,
+        analyzer, topic=topic, papers_info=papers_info, limit=limit,
     )
     quality_evaluation_task = create_quality_evaluation_task(
         evaluator, limit=limit, context=[deep_analysis_task],
@@ -46,11 +51,14 @@ def create_analysis_crew(papers_info: str, max_papers: int | None = None) -> Cre
         tasks=[deep_analysis_task, quality_evaluation_task],
         process=Process.sequential,
         verbose=True,
+        memory=True,
     )
 
 
-def run_analysis(papers_info: str, max_papers: int | None = None) -> str:
+def run_analysis(
+    papers_info: str, topic: str = "", max_papers: int | None = None
+) -> str:
     """Run the analysis workflow and return the result string."""
-    crew = create_analysis_crew(papers_info, max_papers)
+    crew = create_analysis_crew(papers_info, topic=topic, max_papers=max_papers)
     result = crew.kickoff()
     return str(result)
