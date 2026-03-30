@@ -246,6 +246,15 @@ All providers are accessed via OpenAI-compatible APIs, making it easy to switch 
 
 ---
 
+## 📖 Documentation
+
+| Document | Description |
+|----------|-------------|
+| [Technical Development Guide](docs/technical-guide.md) | System architecture, module design, API reference, extension guide |
+| [User Manual](docs/user-guide.md) | Deployment (Windows 10 & Ubuntu), CLI/API usage, troubleshooting |
+
+---
+
 ## 📝 License
 
 MIT License. See [LICENSE](LICENSE) for details.
