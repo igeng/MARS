@@ -192,7 +192,7 @@ CCF_DATABASE: list[dict[str, Any]] = [
         ],
         "dblp_url": "https://dblp.org/db/journals/jmlr/",
     },
-    # ---- B-rank conferences ----
+    # ---- More A/B-rank conferences ----
     {
         "name": "ICCV",
         "full_name": "International Conference on Computer Vision",
