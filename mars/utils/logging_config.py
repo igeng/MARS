@@ -15,7 +15,6 @@ from __future__ import annotations
 import datetime
 import logging
 import sys
-from io import IOBase
 from typing import IO, Optional
 
 from mars.config.settings import settings
