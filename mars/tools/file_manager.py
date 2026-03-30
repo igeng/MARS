@@ -7,9 +7,7 @@ Handles reading and writing of research output files
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
-from typing import Any
 
 from crewai.tools import BaseTool
 
@@ -28,23 +26,13 @@ class FileWriterTool(BaseTool):
     name: str = "file_writer"
     description: str = (
         "Write content to a file in the output directory. "
-        "Input should be a JSON string with keys: "
-        "'filename' (required), "
-        "'content' (required, string), "
+        "Parameters: 'filename' (required, str), "
+        "'content' (required, str), "
         "'mode' (optional, 'w' or 'a', default 'w'). "
         "Returns the absolute path of the written file."
     )
 
-    def _run(self, query_json: str) -> str:
-        try:
-            params: dict[str, Any] = json.loads(query_json)
-        except json.JSONDecodeError:
-            return "Error: Input must be valid JSON."
-
-        filename: str = params.get("filename", "")
-        content: str = params.get("content", "")
-        mode: str = params.get("mode", "w")
-
+    def _run(self, filename: str, content: str, mode: str = "w") -> str:
         if not filename:
             return "Error: 'filename' is required."
 
@@ -67,18 +55,11 @@ class FileReaderTool(BaseTool):
     name: str = "file_reader"
     description: str = (
         "Read content from a file in the output directory. "
-        "Input should be a JSON string with key: "
-        "'filename' (required). "
+        "Parameters: 'filename' (required, str). "
         "Returns the file content as a string."
     )
 
-    def _run(self, query_json: str) -> str:
-        try:
-            params: dict[str, Any] = json.loads(query_json)
-        except json.JSONDecodeError:
-            params = {"filename": query_json}
-
-        filename: str = params.get("filename", "")
+    def _run(self, filename: str) -> str:
         if not filename:
             return "Error: 'filename' is required."
 

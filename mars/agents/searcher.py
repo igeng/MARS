@@ -12,6 +12,7 @@ from crewai import Agent
 
 from mars.tools.arxiv_api import ArXivSearchTool
 from mars.tools.dblp_search import DBLPSearchTool
+from mars.tools.file_manager import FileWriterTool
 from mars.tools.keyword_expander import KeywordExpanderTool
 from mars.tools.semantic_scholar import SemanticScholarSearchTool
 from mars.services.llm_gateway import get_llm_by_task
@@ -39,6 +40,7 @@ def create_searcher_agent() -> Agent:
             SemanticScholarSearchTool(),
             ArXivSearchTool(),
             KeywordExpanderTool(),
+            FileWriterTool(),
         ],
         verbose=True,
         allow_delegation=False,

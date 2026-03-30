@@ -4,12 +4,12 @@ Full Research Crew - 完整研究流程
 Flow:
   User topic
     → Researcher Agent (domain analysis)
-    → Searcher Agent (bulk retrieval, 50 papers)
+    → Searcher Agent (bulk retrieval, 50 papers, saves paper_search.json)
     → [Parallel]
         ├─ Analyzer Agent (deep analysis, top 20 papers)
         ├─ Connector Agent (relationship analysis, all 50 papers)
         └─ Evaluator Agent (quality evaluation, top 20 papers)
-    → Summarizer Agent (comprehensive review)
+    → Summarizer Agent (English review → Chinese translation)
     → Return complete research report
 """
 
@@ -73,8 +73,9 @@ def create_full_research_crew(topic: str) -> Crew:
         evaluator, limit=analysis_limit, context=[deep_analysis_task]
     )
 
-    # ---- Sequential phase 2: Comprehensive bilingual reviews ----
-    chinese_review_task = create_review_generation_task(
+    # ---- Sequential phase 3: Comprehensive bilingual reviews ----
+    # Generate English review first (source papers are in English)
+    english_review_task = create_english_review_task(
         summarizer,
         topic,
         context=[
@@ -85,7 +86,8 @@ def create_full_research_crew(topic: str) -> Crew:
             quality_evaluation_task,
         ],
     )
-    english_review_task = create_english_review_task(
+    # Then translate English review to Chinese (avoids re-generating content)
+    chinese_review_task = create_review_generation_task(
         summarizer,
         topic,
         context=[
@@ -94,7 +96,7 @@ def create_full_research_crew(topic: str) -> Crew:
             deep_analysis_task,
             connection_analysis_task,
             quality_evaluation_task,
-            chinese_review_task,
+            english_review_task,
         ],
     )
 
@@ -106,8 +108,8 @@ def create_full_research_crew(topic: str) -> Crew:
             deep_analysis_task,
             connection_analysis_task,
             quality_evaluation_task,
-            chinese_review_task,
             english_review_task,
+            chinese_review_task,
         ],
         process=Process.sequential,
         verbose=True,
