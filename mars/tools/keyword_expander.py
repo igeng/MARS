@@ -9,7 +9,6 @@ This broadens search coverage when querying academic databases.
 from __future__ import annotations
 
 import json
-from typing import Any
 
 from crewai.tools import BaseTool
 
@@ -23,21 +22,12 @@ class KeywordExpanderTool(BaseTool):
     description: str = (
         "Expand research keywords into synonyms and related terms to improve "
         "academic search coverage. "
-        "Input should be a JSON string with keys: "
-        "'keyword' (required), "
+        "Input: 'keyword' (required, the research keyword to expand), "
         "'provider' (optional, LLM provider: qwen/deepseek/kimi/glm). "
         "Returns a list of expanded keywords."
     )
 
-    def _run(self, query_json: str) -> str:
-        try:
-            params: dict[str, Any] = json.loads(query_json)
-        except json.JSONDecodeError:
-            params = {"keyword": query_json}
-
-        keyword: str = params.get("keyword", "")
-        provider: str | None = params.get("provider")
-
+    def _run(self, keyword: str, provider: str | None = None) -> str:
         if not keyword:
             return "Error: 'keyword' parameter is required."
 

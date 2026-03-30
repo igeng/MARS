@@ -13,6 +13,7 @@ Usage:
 
 from __future__ import annotations
 
+import datetime
 import sys
 
 import typer
@@ -49,6 +50,20 @@ def _print_banner() -> None:
     console.print(Panel(banner, border_style="cyan"))
 
 
+def _save_result(result: str, prefix: str) -> None:
+    """Save *result* to a timestamped Markdown file in the output directory."""
+    from mars.config import settings
+
+    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f"{prefix}_{timestamp}.md"
+    file_path = settings.OUTPUT_DIR / filename
+    try:
+        file_path.write_text(result, encoding="utf-8")
+        console.print(f"\n[dim]💾 结果已保存至：{file_path.resolve()}[/dim]")
+    except OSError as exc:
+        console.print(f"[yellow]⚠ 结果保存失败：{exc}[/yellow]")
+
+
 def _startup() -> None:
     """Common startup tasks: logging, output dir, database."""
     from mars.utils.logging_config import setup_logging
@@ -78,6 +93,7 @@ def search_command(
         result = run_search(topic, max_results=max_results)
         console.print("\n[bold cyan]📋 检索结果：[/bold cyan]")
         console.print(result)
+        _save_result(result, "search_results")
     except Exception as exc:
         console.print(f"[bold red]❌ 检索失败：{exc}[/bold red]")
         raise typer.Exit(1) from exc
@@ -106,6 +122,7 @@ def analyze_command(
         result = run_analysis(papers, max_papers=max_papers)
         console.print("\n[bold cyan]📊 分析报告：[/bold cyan]")
         console.print(result)
+        _save_result(result, "analysis_report")
     except Exception as exc:
         console.print(f"[bold red]❌ 分析失败：{exc}[/bold red]")
         raise typer.Exit(1) from exc
@@ -133,6 +150,7 @@ def connect_command(
         result = run_connection(papers, topic=topic)
         console.print("\n[bold cyan]🗺️  关联分析报告：[/bold cyan]")
         console.print(result)
+        _save_result(result, "connection_report")
     except Exception as exc:
         console.print(f"[bold red]❌ 关联分析失败：{exc}[/bold red]")
         raise typer.Exit(1) from exc
@@ -159,6 +177,7 @@ def full_research_command(
         result = run_full_research(topic)
         console.print("\n[bold cyan]📚 完整研究报告：[/bold cyan]")
         console.print(result)
+        _save_result(result, "full_research_report")
     except Exception as exc:
         console.print(f"[bold red]❌ 研究流程失败：{exc}[/bold red]")
         raise typer.Exit(1) from exc
