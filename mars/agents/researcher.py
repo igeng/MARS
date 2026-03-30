@@ -12,7 +12,7 @@ from crewai import Agent
 
 from mars.tools.ccf_database import CCFDatabaseQueryTool
 from mars.tools.keyword_expander import KeywordExpanderTool
-from mars.utils.llm_factory import get_qwen_llm
+from mars.services.llm_gateway import get_llm_by_task
 
 
 def create_researcher_agent() -> Agent:
@@ -29,7 +29,7 @@ def create_researcher_agent() -> Agent:
             "你的专长是帮助研究者精准定位最适合的发表平台和检索来源，"
             "能够快速从一个模糊的研究方向中提炼出精确的检索策略。"
         ),
-        llm=get_qwen_llm(),
+        llm=get_llm_by_task("researcher"),
         tools=[
             CCFDatabaseQueryTool(),
             KeywordExpanderTool(),

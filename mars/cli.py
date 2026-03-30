@@ -6,12 +6,11 @@ Usage:
     mars analyze "paper1 title | paper2 title | ..."
     mars connect "paper IDs or titles" --topic "federated learning"
     mars full "federated learning with differential privacy"
+    mars api                          # Start FastAPI server
+    mars init-db                      # Initialise the database
 """
 
 from __future__ import annotations
-
-import sys
-from pathlib import Path
 
 import typer
 from rich.console import Console
@@ -134,6 +133,38 @@ def full_research_command(
     except Exception as exc:
         console.print(f"[bold red]❌ 研究流程失败：{exc}[/bold red]")
         raise typer.Exit(1) from exc
+
+
+@app.command("api")
+def api_command(
+    host: str = typer.Option("0.0.0.0", "--host", "-h", help="绑定主机地址"),
+    port: int = typer.Option(8000, "--port", "-p", help="端口号"),
+) -> None:
+    """
+    启动 FastAPI REST API 服务器
+    """
+    _print_banner()
+    console.print(
+        f"\n[bold green]🌐 启动 API 服务器：[/bold green] http://{host}:{port}\n"
+    )
+
+    import uvicorn
+
+    uvicorn.run("mars.api.main:app", host=host, port=port, reload=False)
+
+
+@app.command("init-db")
+def init_db_command() -> None:
+    """
+    初始化数据库表结构
+    """
+    _print_banner()
+    console.print("\n[bold green]🗄️  初始化数据库...[/bold green]\n")
+
+    from mars.database.models import init_db
+
+    init_db()
+    console.print("[bold cyan]✅ 数据库初始化完成[/bold cyan]")
 
 
 def main() -> None:

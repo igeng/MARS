@@ -13,7 +13,7 @@ from crewai import Agent
 from mars.tools.citation_network import CitationNetworkTool
 from mars.tools.file_manager import FileWriterTool
 from mars.tools.semantic_scholar import SemanticScholarSearchTool
-from mars.utils.llm_factory import get_glm_llm
+from mars.services.llm_gateway import get_llm_by_task
 
 
 def create_connector_agent() -> Agent:
@@ -31,7 +31,7 @@ def create_connector_agent() -> Agent:
             "通过分析引用模式和主题聚类，揭示领域内的研究热点、"
             "新兴方向和潜在合作机会。"
         ),
-        llm=get_glm_llm(),
+        llm=get_llm_by_task("connector"),
         tools=[
             CitationNetworkTool(),
             SemanticScholarSearchTool(),

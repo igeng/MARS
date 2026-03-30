@@ -14,7 +14,7 @@ from mars.tools.arxiv_api import ArXivSearchTool
 from mars.tools.dblp_search import DBLPSearchTool
 from mars.tools.keyword_expander import KeywordExpanderTool
 from mars.tools.semantic_scholar import SemanticScholarSearchTool
-from mars.utils.llm_factory import get_deepseek_llm
+from mars.services.llm_gateway import get_llm_by_task
 
 
 def create_searcher_agent() -> Agent:
@@ -33,7 +33,7 @@ def create_searcher_agent() -> Agent:
             "能够根据用户需求优化检索策略，组合使用多种检索工具，"
             "并对结果进行智能排序和去重处理。"
         ),
-        llm=get_deepseek_llm(),
+        llm=get_llm_by_task("searcher"),
         tools=[
             DBLPSearchTool(),
             SemanticScholarSearchTool(),

@@ -1,64 +1,66 @@
 """
 MARS application settings.
 
-Loads configuration from environment variables / .env file.
+Uses Pydantic BaseSettings for typed configuration with
+automatic environment variable loading and .env file support.
 """
 
-import os
 from pathlib import Path
 
-from dotenv import load_dotenv
+from pydantic import Field
+from pydantic_settings import BaseSettings
 
-# Load .env from project root (two levels up from this file)
+# .env file path (project root, two levels up from this file)
 _ENV_PATH = Path(__file__).resolve().parents[2] / ".env"
-load_dotenv(dotenv_path=_ENV_PATH, override=False)
 
 
-# ---------------------------------------------------------------------------
-# LLM Provider API keys
-# ---------------------------------------------------------------------------
+class MarsSettings(BaseSettings):
+    """Centralised settings loaded from environment variables / .env file."""
 
-DASHSCOPE_API_KEY: str = os.getenv("DASHSCOPE_API_KEY", "")
-DEEPSEEK_API_KEY: str = os.getenv("DEEPSEEK_API_KEY", "")
-MOONSHOT_API_KEY: str = os.getenv("MOONSHOT_API_KEY", "")
-ZHIPU_API_KEY: str = os.getenv("ZHIPU_API_KEY", "")
+    model_config = {"env_file": str(_ENV_PATH), "env_file_encoding": "utf-8"}
 
-# ---------------------------------------------------------------------------
-# Model identifiers
-# ---------------------------------------------------------------------------
+    # ---- LLM Provider API keys ----
+    DASHSCOPE_API_KEY: str = ""
+    DEEPSEEK_API_KEY: str = ""
+    MOONSHOT_API_KEY: str = ""
+    ZHIPU_API_KEY: str = ""
 
-QWEN_MODEL: str = os.getenv("QWEN_MODEL", "qwen-max")
-QWEN_PLUS_MODEL: str = os.getenv("QWEN_PLUS_MODEL", "qwen-plus")
-QWEN_TURBO_MODEL: str = os.getenv("QWEN_TURBO_MODEL", "qwen-turbo")
+    # ---- Model identifiers ----
+    QWEN_MODEL: str = "qwen-max"
+    QWEN_PLUS_MODEL: str = "qwen-plus"
+    QWEN_TURBO_MODEL: str = "qwen-turbo"
 
-DEEPSEEK_MODEL: str = os.getenv("DEEPSEEK_MODEL", "deepseek-chat")
-DEEPSEEK_CODER_MODEL: str = os.getenv("DEEPSEEK_CODER_MODEL", "deepseek-coder")
+    DEEPSEEK_MODEL: str = "deepseek-chat"
+    DEEPSEEK_CODER_MODEL: str = "deepseek-coder"
 
-KIMI_MODEL: str = os.getenv("KIMI_MODEL", "moonshot-v1-8k")
-KIMI_LONG_MODEL: str = os.getenv("KIMI_LONG_MODEL", "moonshot-v1-128k")
+    KIMI_MODEL: str = "moonshot-v1-8k"
+    KIMI_LONG_MODEL: str = "moonshot-v1-128k"
 
-GLM_MODEL: str = os.getenv("GLM_MODEL", "glm-4-plus")
-GLM_AIR_MODEL: str = os.getenv("GLM_AIR_MODEL", "glm-4-air")
+    GLM_MODEL: str = "glm-4-plus"
+    GLM_AIR_MODEL: str = "glm-4-air"
 
-# ---------------------------------------------------------------------------
-# API endpoints
-# ---------------------------------------------------------------------------
+    # ---- API endpoints ----
+    DEEPSEEK_BASE_URL: str = "https://api.deepseek.com/v1"
+    MOONSHOT_BASE_URL: str = "https://api.moonshot.cn/v1"
 
-DEEPSEEK_BASE_URL: str = "https://api.deepseek.com/v1"
-MOONSHOT_BASE_URL: str = "https://api.moonshot.cn/v1"
+    # ---- Academic search ----
+    SEMANTIC_SCHOLAR_API_KEY: str = ""
+    MAX_PAPERS_PER_SEARCH: int = Field(default=50, gt=0)
+    MAX_PAPERS_FOR_ANALYSIS: int = Field(default=20, gt=0)
 
-# ---------------------------------------------------------------------------
-# Academic search settings
-# ---------------------------------------------------------------------------
+    # ---- Application ----
+    DEFAULT_LLM_PROVIDER: str = "qwen"
+    LOG_LEVEL: str = "INFO"
+    OUTPUT_DIR: Path = Path("./output")
 
-SEMANTIC_SCHOLAR_API_KEY: str = os.getenv("SEMANTIC_SCHOLAR_API_KEY", "")
-MAX_PAPERS_PER_SEARCH: int = int(os.getenv("MAX_PAPERS_PER_SEARCH", "50"))
-MAX_PAPERS_FOR_ANALYSIS: int = int(os.getenv("MAX_PAPERS_FOR_ANALYSIS", "20"))
+    # ---- Database ----
+    DATABASE_URL: str = "sqlite:///./mars.db"
 
-# ---------------------------------------------------------------------------
-# Application settings
-# ---------------------------------------------------------------------------
+    # ---- API server ----
+    API_HOST: str = "0.0.0.0"
+    API_PORT: int = 8000
 
-DEFAULT_LLM_PROVIDER: str = os.getenv("DEFAULT_LLM_PROVIDER", "qwen")
-LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO")
-OUTPUT_DIR: Path = Path(os.getenv("OUTPUT_DIR", "./output"))
+
+# Module-level singleton so that ``from mars.config import settings`` keeps
+# working everywhere without any change to call sites.
+settings = MarsSettings()

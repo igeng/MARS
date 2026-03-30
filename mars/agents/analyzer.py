@@ -14,7 +14,7 @@ from mars.tools.arxiv_api import ArXivSearchTool
 from mars.tools.file_manager import FileWriterTool
 from mars.tools.pdf_parser import PDFParserTool
 from mars.tools.semantic_scholar import SemanticScholarSearchTool
-from mars.utils.llm_factory import get_kimi_llm
+from mars.services.llm_gateway import get_llm_by_task
 
 
 def create_analyzer_agent() -> Agent:
@@ -32,7 +32,7 @@ def create_analyzer_agent() -> Agent:
             "并用清晰的结构化语言呈现出来。"
             "你特别擅长处理长文本，能够从数十页的论文中提炼出最关键的信息。"
         ),
-        llm=get_kimi_llm(),
+        llm=get_llm_by_task("analyzer"),
         tools=[
             ArXivSearchTool(),
             SemanticScholarSearchTool(),

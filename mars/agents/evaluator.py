@@ -12,7 +12,7 @@ from crewai import Agent
 
 from mars.tools.file_manager import FileWriterTool
 from mars.tools.semantic_scholar import SemanticScholarSearchTool
-from mars.utils.llm_factory import get_deepseek_llm
+from mars.services.llm_gateway import get_llm_by_task
 
 
 def create_evaluator_agent() -> Agent:
@@ -30,7 +30,7 @@ def create_evaluator_agent() -> Agent:
             "你的评估标准严格但公正，能够识别论文的真正创新点，"
             "也能指出其局限性和改进空间。"
         ),
-        llm=get_deepseek_llm(),
+        llm=get_llm_by_task("evaluator"),
         tools=[
             SemanticScholarSearchTool(),
             FileWriterTool(),

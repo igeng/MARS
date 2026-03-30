@@ -11,7 +11,7 @@ from __future__ import annotations
 from crewai import Agent
 
 from mars.tools.file_manager import FileWriterTool
-from mars.utils.llm_factory import get_qwen_llm
+from mars.services.llm_gateway import get_llm_by_task
 
 
 def create_summarizer_agent() -> Agent:
@@ -29,7 +29,7 @@ def create_summarizer_agent() -> Agent:
             "并指出未来的研究方向。你的综述报告逻辑清晰、"
             "结构完整，能够帮助读者快速掌握一个研究领域的全貌。"
         ),
-        llm=get_qwen_llm(),
+        llm=get_llm_by_task("summarizer"),
         tools=[
             FileWriterTool(),
         ],
