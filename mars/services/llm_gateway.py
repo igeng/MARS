@@ -18,11 +18,14 @@ Two types of LLM objects are returned:
 * :func:`get_llm_by_task` returns a :class:`crewai.LLM` instance for
   use in CrewAI ``Agent`` objects.  CrewAI ≥0.80 uses either a native
   provider SDK or LiteLLM internally; both require the model string to
-  carry a provider prefix (e.g. ``dashscope/<model>`` for DashScope,
-  ``moonshot/<model>`` for Moonshot/Kimi) together with a ``base_url``
-  pointing at the correct endpoint.  Passing a raw ``ChatOpenAI`` object
-  causes CrewAI/LiteLLM to extract only the bare model name, which then
-  fails with "LLM Provider NOT provided".
+  carry a provider prefix.  All OpenAI-compatible endpoints (DashScope,
+  Moonshot/Kimi, Zhipu AI) use the ``openai/<model>`` prefix with a
+  custom ``base_url`` — the reliable LiteLLM path for any custom
+  OpenAI-compatible API.  Provider-specific prefixes such as
+  ``dashscope/`` or ``moonshot/`` can cause the installed provider SDK
+  to intercept the call and strip the prefix, resulting in a
+  "LLM Provider NOT provided" error.  Passing a raw ``ChatOpenAI`` object
+  also fails in the same way.
 """
 
 from __future__ import annotations
@@ -72,12 +75,16 @@ def _crewai_compatible_llm(
 
     Used when assigning an LLM to a CrewAI ``Agent``.  CrewAI ≥0.80 passes
     LLM calls through either a native provider SDK or LiteLLM.  The model
-    string must carry the correct provider prefix so that CrewAI routes the
-    call to the right backend (e.g. ``dashscope/<model>`` for DashScope,
-    ``moonshot/<model>`` for Moonshot/Kimi, ``deepseek/<model>`` for DeepSeek,
-    and ``openai/<model>`` + custom ``base_url`` for other OpenAI-compatible
-    endpoints such as Zhipu AI).  Providers without a native crewai driver
-    (moonshot, zhipu) rely on LiteLLM (``pip install litellm``).
+    string must carry the correct provider prefix so that CrewAI/LiteLLM
+    routes the call to the right backend.  For all OpenAI-compatible
+    endpoints (DashScope, Moonshot/Kimi, Zhipu AI) use ``openai/<model>``
+    together with a custom ``base_url``; this is the standard LiteLLM
+    pattern for custom OpenAI-compatible APIs.  Using provider-specific
+    prefixes such as ``dashscope/<model>`` or ``moonshot/<model>`` can cause
+    LiteLLM to strip the prefix before calling the fallback path, resulting
+    in a "LLM Provider NOT provided" error.  Only ``deepseek/`` is kept as a
+    native LiteLLM provider because DeepSeek is fully supported without a
+    custom base_url.
 
     When *api_key* is falsy (either ``None`` or an empty string ``""``, which
     both occur in test environments where no key is configured) the function
@@ -160,28 +167,32 @@ _PROVIDER_MAP = {
 }
 
 # crewai.LLM factories – used by get_llm_by_task() for agent construction.
-# The model_prefix is prepended to the model name so crewai/LiteLLM routes
-# the call to the correct backend:
-#   dashscope/* → crewai native DashScope (China endpoint via base_url override)
-#   deepseek/*  → crewai native DeepSeek
-#   moonshot/*  → LiteLLM Moonshot (requires litellm package)
-#   openai/*    → LiteLLM OpenAI-compatible (custom base_url; used for Zhipu)
+# All OpenAI-compatible providers (DashScope, Moonshot, Zhipu) use the
+# "openai" model prefix with a custom base_url.  This is the reliable
+# LiteLLM path for any OpenAI-compatible endpoint.  DeepSeek uses the
+# "deepseek" prefix because it is a natively supported LiteLLM provider.
 
 
 class _CrewAIProviderCfg(NamedTuple):
     """Configuration needed to construct a crewai.LLM for a given provider."""
 
-    model_prefix: str    # LiteLLM provider prefix (e.g. "dashscope", "moonshot")
+    model_prefix: str    # LiteLLM provider prefix (e.g. "openai", "deepseek")
     model_attr: str      # Settings attribute name holding the default model name
     key_attr: str        # Settings attribute name holding the API key
     base_url: str        # Endpoint URL for the provider
 
 
 _CREWAI_PROVIDER_CFG: dict[str, _CrewAIProviderCfg] = {
-    "qwen":     _CrewAIProviderCfg("dashscope", "QWEN_MODEL",    "DASHSCOPE_API_KEY", "https://dashscope.aliyuncs.com/compatible-mode/v1"),
-    "deepseek": _CrewAIProviderCfg("deepseek",  "DEEPSEEK_MODEL", "DEEPSEEK_API_KEY",  "https://api.deepseek.com/v1"),
-    "kimi":     _CrewAIProviderCfg("moonshot",  "KIMI_MODEL",     "MOONSHOT_API_KEY",  "https://api.moonshot.cn/v1"),
-    "glm":      _CrewAIProviderCfg("openai",    "GLM_MODEL",      "ZHIPU_API_KEY",     "https://open.bigmodel.cn/api/paas/v4"),
+    # Use the "openai" prefix for all OpenAI-compatible endpoints so that
+    # LiteLLM routes the call through the standard OpenAI SDK with a custom
+    # base_url.  Provider-specific prefixes (e.g. "dashscope", "moonshot")
+    # are not reliably handled by LiteLLM and cause "LLM Provider NOT
+    # provided" errors when the installed provider SDK intercepts the call
+    # and strips the prefix before the LiteLLM fallback path runs.
+    "qwen":     _CrewAIProviderCfg("openai",   "QWEN_MODEL",    "DASHSCOPE_API_KEY", "https://dashscope.aliyuncs.com/compatible-mode/v1"),
+    "deepseek": _CrewAIProviderCfg("deepseek", "DEEPSEEK_MODEL", "DEEPSEEK_API_KEY",  "https://api.deepseek.com/v1"),
+    "kimi":     _CrewAIProviderCfg("openai",   "KIMI_MODEL",     "MOONSHOT_API_KEY",  "https://api.moonshot.cn/v1"),
+    "glm":      _CrewAIProviderCfg("openai",   "GLM_MODEL",      "ZHIPU_API_KEY",     "https://open.bigmodel.cn/api/paas/v4"),
 }
 
 
