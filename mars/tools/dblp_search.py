@@ -10,15 +10,48 @@ API reference: https://dblp.org/faq/How+to+use+the+dblp+search+API.html
 from __future__ import annotations
 
 import json
-from typing import Any
+from typing import Any, Optional
 
 import requests
 from crewai.tools import BaseTool
+from pydantic import BaseModel, Field, model_validator
 
 from mars.utils.retry import retry_on_network_error
 
 DBLP_SEARCH_URL = "https://dblp.org/search/publ/api"
 DEFAULT_MAX_RESULTS = 20
+
+
+class DBLPSearchToolSchema(BaseModel):
+    """Input schema for DBLPSearchTool.
+
+    Accepts either a pre-encoded ``query_json`` string **or** the individual
+    fields (``query``, ``max_results``, ``year_from``, ``year_to``).  When
+    individual fields are supplied the validator packs them into ``query_json``
+    so the existing ``_run`` implementation stays unchanged.
+    """
+
+    query_json: str = Field(
+        description=(
+            "JSON string with keys: 'query' (required, search keywords), "
+            "'max_results' (optional, integer, default 20), "
+            "'year_from' (optional, int), 'year_to' (optional, int)."
+        )
+    )
+
+    @model_validator(mode="before")
+    @classmethod
+    def _coerce_direct_args(cls, values: Any) -> Any:
+        """Pack individual LLM-supplied fields into a single JSON string."""
+        if not isinstance(values, dict):
+            return values
+        if "query_json" not in values and "query" in values:
+            payload: dict[str, Any] = {"query": values["query"]}
+            for key in ("max_results", "year_from", "year_to"):
+                if values.get(key) is not None:
+                    payload[key] = values[key]
+            return {"query_json": json.dumps(payload)}
+        return values
 
 
 @retry_on_network_error(max_retries=3)
@@ -41,6 +74,7 @@ class DBLPSearchTool(BaseTool):
         "'year_to' (optional, int). "
         "Returns a list of papers with title, authors, venue, year, and URL."
     )
+    args_schema: type[DBLPSearchToolSchema] = DBLPSearchToolSchema
 
     def _run(self, query_json: str) -> str:
         try:

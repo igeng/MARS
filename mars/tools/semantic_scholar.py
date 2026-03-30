@@ -10,10 +10,11 @@ API docs: https://api.semanticscholar.org/api-docs/
 from __future__ import annotations
 
 import json
-from typing import Any
+from typing import Any, Optional
 
 import requests
 from crewai.tools import BaseTool
+from pydantic import BaseModel, Field, model_validator
 
 from mars.config import settings
 from mars.utils.retry import retry_on_network_error
@@ -24,6 +25,35 @@ SS_FIELDS = (
     "externalIds,abstract,openAccessPdf,url"
 )
 DEFAULT_MAX_RESULTS = 20
+
+
+class SemanticScholarSearchToolSchema(BaseModel):
+    """Input schema for SemanticScholarSearchTool.
+
+    Accepts either a pre-encoded ``query_json`` string or individual fields.
+    """
+
+    query_json: str = Field(
+        description=(
+            "JSON string with keys: 'query' (required), "
+            "'max_results' (optional, default 20), "
+            "'year_from' (optional, int), 'year_to' (optional, int), "
+            "'min_citations' (optional, int)."
+        )
+    )
+
+    @model_validator(mode="before")
+    @classmethod
+    def _coerce_direct_args(cls, values: Any) -> Any:
+        if not isinstance(values, dict):
+            return values
+        if "query_json" not in values and "query" in values:
+            payload: dict[str, Any] = {"query": values["query"]}
+            for key in ("max_results", "year_from", "year_to", "min_citations"):
+                if values.get(key) is not None:
+                    payload[key] = values[key]
+            return {"query_json": json.dumps(payload)}
+        return values
 
 
 @retry_on_network_error(max_retries=3)
@@ -48,6 +78,7 @@ class SemanticScholarSearchTool(BaseTool):
         "Returns papers with title, authors, venue, year, citation count, "
         "abstract, and PDF URL when available."
     )
+    args_schema: type[SemanticScholarSearchToolSchema] = SemanticScholarSearchToolSchema
 
     def _run(self, query_json: str) -> str:
         try:

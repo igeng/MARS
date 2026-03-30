@@ -15,6 +15,8 @@ from __future__ import annotations
 
 import datetime
 import sys
+from pathlib import Path
+from typing import IO, Optional
 
 import typer
 from rich.console import Console
@@ -42,6 +44,58 @@ app = typer.Typer(
 console = Console(legacy_windows=False)
 
 
+# ---------------------------------------------------------------------------
+# Internal helpers
+# ---------------------------------------------------------------------------
+
+class _TeeWriter:
+    """Wraps a primary text stream and mirrors all writes to a secondary one.
+
+    Passes ``isatty()`` and ``fileno()`` through to the primary stream so
+    that downstream code (e.g. Rich's auto-detection) behaves as if the
+    terminal is still attached.
+    """
+
+    def __init__(self, primary: IO[str], secondary: IO[str]) -> None:
+        self._primary = primary
+        self._secondary = secondary
+
+    def write(self, data: str) -> int:
+        n = self._primary.write(data)
+        try:
+            self._secondary.write(data)
+        except Exception:
+            pass
+        return n
+
+    def flush(self) -> None:
+        self._primary.flush()
+        try:
+            self._secondary.flush()
+        except Exception:
+            pass
+
+    def isatty(self) -> bool:
+        return getattr(self._primary, "isatty", lambda: False)()
+
+    def fileno(self) -> int:
+        return self._primary.fileno()
+
+    # Forward any attribute lookups not handled above to the primary stream
+    def __getattr__(self, name: str):
+        return getattr(self._primary, name)
+
+
+def _create_run_dir(prefix: str) -> Path:
+    """Return (and create) a timestamped sub-folder inside OUTPUT_DIR."""
+    from mars.config import settings
+
+    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    run_dir = settings.OUTPUT_DIR / f"{prefix}_{timestamp}"
+    run_dir.mkdir(parents=True, exist_ok=True)
+    return run_dir
+
+
 def _print_banner() -> None:
     banner = Text()
     banner.append("🚀 MARS", style="bold cyan")
@@ -64,14 +118,20 @@ def _save_result(result: str, prefix: str) -> None:
         console.print(f"[yellow]⚠ 结果保存失败：{exc}[/yellow]")
 
 
-def _startup() -> None:
-    """Common startup tasks: logging, output dir, database."""
+def _startup(run_dir: Optional[Path] = None) -> None:
+    """Common startup: redirect OUTPUT_DIR to *run_dir*, configure logging."""
     from mars.utils.logging_config import setup_logging
     from mars.config import settings
 
-    setup_logging()
+    if run_dir is not None:
+        settings.OUTPUT_DIR = run_dir
     settings.OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    setup_logging()
 
+
+# ---------------------------------------------------------------------------
+# Commands
+# ---------------------------------------------------------------------------
 
 @app.command("search")
 def search_command(
@@ -81,22 +141,59 @@ def search_command(
     ),
 ) -> None:
     """
-    基础检索流程：领域分析 → 论文检索 → 返回论文列表
+    基础检索流程：领域分析 → 论文检索 → 中/英文献综述 → 保存5份输出文件
     """
-    _print_banner()
-    _startup()
-    console.print(f"\n[bold green]🔍 开始检索：[/bold green] {topic}\n")
+    from mars.config import settings
 
-    from mars.crews.search_crew import run_search
+    # Create per-run output folder
+    settings.OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    run_dir = _create_run_dir("search")
+
+    # Open the unified run log (captures both our prints and CrewAI verbose)
+    log_path = run_dir / "run.log"
+    log_fh = open(log_path, "w", encoding="utf-8", errors="replace")
+
+    # Redirect sys.stdout / sys.stderr through the tee so that everything
+    # printed to the terminal is also written to run.log
+    _orig_stdout, _orig_stderr = sys.stdout, sys.stderr
+    sys.stdout = _TeeWriter(_orig_stdout, log_fh)
+    sys.stderr = _TeeWriter(_orig_stderr, log_fh)
+
+    # Reinitialise the module-level Rich console to use the tee so that our
+    # own formatted output is also captured.
+    global console
+    console = Console(file=sys.stdout, legacy_windows=False)
 
     try:
+        # Save prompt
+        (run_dir / "prompt.txt").write_text(topic, encoding="utf-8")
+
+        _print_banner()
+        _startup(run_dir)          # sets OUTPUT_DIR = run_dir and calls setup_logging
+
+        console.print(f"\n[bold green]🔍 开始检索：[/bold green] {topic}\n")
+        console.print(
+            f"[dim]📁 本次运行输出目录：{run_dir.resolve()}[/dim]\n"
+            f"[dim]预计生成5份文件：prompt.txt、run.log、paper_search.json、"
+            f"review_zh.md、review_en.md[/dim]\n"
+        )
+
+        from mars.crews.search_crew import run_search
+
         result = run_search(topic, max_results=max_results)
-        console.print("\n[bold cyan]📋 检索结果：[/bold cyan]")
-        console.print(result)
-        _save_result(result, "search_results")
+        console.print("\n[bold cyan]📋 检索完成[/bold cyan]")
+        console.print(f"\n[dim]✅ 所有输出文件已保存至：{run_dir.resolve()}[/dim]")
+
     except Exception as exc:
         console.print(f"[bold red]❌ 检索失败：{exc}[/bold red]")
         raise typer.Exit(1) from exc
+    finally:
+        log_fh.flush()
+        sys.stdout = _orig_stdout
+        sys.stderr = _orig_stderr
+        log_fh.close()
+        # Restore console to a plain terminal console
+        console = Console(legacy_windows=False)
 
 
 @app.command("analyze")
@@ -112,13 +209,27 @@ def analyze_command(
     """
     深度分析流程：论文获取 → 深度解析 → 质量评估 → 返回分析报告
     """
-    _print_banner()
-    _startup()
-    console.print(f"\n[bold green]🔬 开始深度分析...[/bold green]\n")
+    from mars.config import settings
 
-    from mars.crews.analysis_crew import run_analysis
+    settings.OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    run_dir = _create_run_dir("analyze")
+    log_path = run_dir / "run.log"
+    log_fh = open(log_path, "w", encoding="utf-8", errors="replace")
+    _orig_stdout, _orig_stderr = sys.stdout, sys.stderr
+    sys.stdout = _TeeWriter(_orig_stdout, log_fh)
+    sys.stderr = _TeeWriter(_orig_stderr, log_fh)
+    global console
+    console = Console(file=sys.stdout, legacy_windows=False)
 
     try:
+        (run_dir / "prompt.txt").write_text(papers, encoding="utf-8")
+        _print_banner()
+        _startup(run_dir)
+        console.print(f"\n[bold green]🔬 开始深度分析...[/bold green]\n")
+        console.print(f"[dim]📁 本次运行输出目录：{run_dir.resolve()}[/dim]\n")
+
+        from mars.crews.analysis_crew import run_analysis
+
         result = run_analysis(papers, max_papers=max_papers)
         console.print("\n[bold cyan]📊 分析报告：[/bold cyan]")
         console.print(result)
@@ -126,6 +237,12 @@ def analyze_command(
     except Exception as exc:
         console.print(f"[bold red]❌ 分析失败：{exc}[/bold red]")
         raise typer.Exit(1) from exc
+    finally:
+        log_fh.flush()
+        sys.stdout = _orig_stdout
+        sys.stderr = _orig_stderr
+        log_fh.close()
+        console = Console(legacy_windows=False)
 
 
 @app.command("connect")
@@ -138,15 +255,31 @@ def connect_command(
     ),
 ) -> None:
     """
-    关联分析流程：引用分析 → 相似度计算 → 综述生成 → 返回关联图谱和综述
+    关联分析流程：引用分析 → 相似度计算 → 中/英综述生成 → 返回关联图谱和综述
     """
-    _print_banner()
-    _startup()
-    console.print(f"\n[bold green]🔗 开始关联分析...[/bold green]\n")
+    from mars.config import settings
 
-    from mars.crews.connection_crew import run_connection
+    settings.OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    run_dir = _create_run_dir("connect")
+    log_path = run_dir / "run.log"
+    log_fh = open(log_path, "w", encoding="utf-8", errors="replace")
+    _orig_stdout, _orig_stderr = sys.stdout, sys.stderr
+    sys.stdout = _TeeWriter(_orig_stdout, log_fh)
+    sys.stderr = _TeeWriter(_orig_stderr, log_fh)
+    global console
+    console = Console(file=sys.stdout, legacy_windows=False)
 
     try:
+        (run_dir / "prompt.txt").write_text(
+            f"papers: {papers}\ntopic: {topic}", encoding="utf-8"
+        )
+        _print_banner()
+        _startup(run_dir)
+        console.print(f"\n[bold green]🔗 开始关联分析...[/bold green]\n")
+        console.print(f"[dim]📁 本次运行输出目录：{run_dir.resolve()}[/dim]\n")
+
+        from mars.crews.connection_crew import run_connection
+
         result = run_connection(papers, topic=topic)
         console.print("\n[bold cyan]🗺️  关联分析报告：[/bold cyan]")
         console.print(result)
@@ -154,6 +287,12 @@ def connect_command(
     except Exception as exc:
         console.print(f"[bold red]❌ 关联分析失败：{exc}[/bold red]")
         raise typer.Exit(1) from exc
+    finally:
+        log_fh.flush()
+        sys.stdout = _orig_stdout
+        sys.stderr = _orig_stderr
+        log_fh.close()
+        console = Console(legacy_windows=False)
 
 
 @app.command("full")
@@ -161,19 +300,33 @@ def full_research_command(
     topic: str = typer.Argument(..., help="研究主题（中文或英文）"),
 ) -> None:
     """
-    完整研究流程：领域分析 → 批量检索 → 深度解析 + 关联分析 + 质量评估 → 综述生成
+    完整研究流程：领域分析 → 批量检索 → 深度解析 + 关联分析 + 质量评估 → 中/英综述生成
     """
-    _print_banner()
-    _startup()
-    console.print(f"\n[bold green]🚀 启动完整研究流程：[/bold green] {topic}\n")
-    console.print(
-        "[dim]此流程将依次执行：领域分析 → 论文检索 → 深度解析 → "
-        "关联分析 → 质量评估 → 综述生成[/dim]\n"
-    )
+    from mars.config import settings
 
-    from mars.crews.full_research_crew import run_full_research
+    settings.OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    run_dir = _create_run_dir("full")
+    log_path = run_dir / "run.log"
+    log_fh = open(log_path, "w", encoding="utf-8", errors="replace")
+    _orig_stdout, _orig_stderr = sys.stdout, sys.stderr
+    sys.stdout = _TeeWriter(_orig_stdout, log_fh)
+    sys.stderr = _TeeWriter(_orig_stderr, log_fh)
+    global console
+    console = Console(file=sys.stdout, legacy_windows=False)
 
     try:
+        (run_dir / "prompt.txt").write_text(topic, encoding="utf-8")
+        _print_banner()
+        _startup(run_dir)
+        console.print(f"\n[bold green]🚀 启动完整研究流程：[/bold green] {topic}\n")
+        console.print(
+            "[dim]此流程将依次执行：领域分析 → 论文检索 → 深度解析 → "
+            "关联分析 → 质量评估 → 中/英综述生成[/dim]\n"
+        )
+        console.print(f"[dim]📁 本次运行输出目录：{run_dir.resolve()}[/dim]\n")
+
+        from mars.crews.full_research_crew import run_full_research
+
         result = run_full_research(topic)
         console.print("\n[bold cyan]📚 完整研究报告：[/bold cyan]")
         console.print(result)
@@ -181,6 +334,12 @@ def full_research_command(
     except Exception as exc:
         console.print(f"[bold red]❌ 研究流程失败：{exc}[/bold red]")
         raise typer.Exit(1) from exc
+    finally:
+        log_fh.flush()
+        sys.stdout = _orig_stdout
+        sys.stderr = _orig_stderr
+        log_fh.close()
+        console = Console(legacy_windows=False)
 
 
 @app.command("api")

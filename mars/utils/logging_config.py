@@ -15,14 +15,23 @@ from __future__ import annotations
 import datetime
 import logging
 import sys
+from io import IOBase
+from typing import IO, Optional
 
 from mars.config.settings import settings
 
 _CONFIGURED = False
 
 
-def setup_logging() -> None:
-    """Configure the root logger based on ``settings.LOG_LEVEL``."""
+def setup_logging(log_stream: Optional[IO[str]] = None) -> None:
+    """Configure the root logger based on ``settings.LOG_LEVEL``.
+
+    Args:
+        log_stream: Optional writable text stream to direct file log output to
+                    (e.g. the run-specific ``run.log`` file handle).  When
+                    omitted a timestamped ``.log`` file is created in
+                    ``settings.OUTPUT_DIR`` as before.
+    """
     global _CONFIGURED
     if _CONFIGURED:
         return
@@ -42,12 +51,16 @@ def setup_logging() -> None:
     root.setLevel(level)
     root.addHandler(handler)
 
-    # File handler — save full log to output directory
-    log_dir = settings.OUTPUT_DIR
-    log_dir.mkdir(parents=True, exist_ok=True)
-    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    log_file = log_dir / f"mars_{timestamp}.log"
-    file_handler = logging.FileHandler(log_file, encoding="utf-8")
+    # File handler — write to the supplied stream or a new timestamped file
+    if log_stream is not None:
+        file_handler = logging.StreamHandler(log_stream)
+    else:
+        log_dir = settings.OUTPUT_DIR
+        log_dir.mkdir(parents=True, exist_ok=True)
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        log_file = log_dir / f"mars_{timestamp}.log"
+        file_handler = logging.FileHandler(log_file, encoding="utf-8")
+
     file_handler.setFormatter(formatter)
     root.addHandler(file_handler)
 
