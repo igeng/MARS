@@ -11,6 +11,8 @@
 1. [系统简介](#1-系统简介)
 2. [系统要求](#2-系统要求)
 3. [Windows 10 本地部署](#3-windows-10-本地部署)
+   - [3.1–3.8 标准部署（venv）](#31-安装-python)
+   - [3.9 使用 Conda + PyCharm 部署](#39-使用-conda--pycharm-部署替代方案)
 4. [Ubuntu 云端部署](#4-ubuntu-云端部署)
 5. [配置说明](#5-配置说明)
 6. [命令行（CLI）使用指南](#6-命令行cli使用指南)
@@ -216,6 +218,249 @@ mars api --port 8000
    - 运行 `regedit`
    - 导航到 `HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\FileSystem`
    - 设置 `LongPathsEnabled` 为 `1`
+
+### 3.9 使用 Conda + PyCharm 部署（替代方案）
+
+如果你的 Windows 10 电脑已经安装了 **Anaconda/Miniconda** 和 **PyCharm**，可以使用以下方式部署 MARS，无需单独安装 Python 或使用 `venv`。
+
+#### 3.9.1 前置条件
+
+| 软件 | 说明 |
+|------|------|
+| Anaconda 或 Miniconda | [Anaconda 下载](https://www.anaconda.com/download) / [Miniconda 下载](https://docs.conda.io/en/latest/miniconda.html) |
+| PyCharm | Community 版即可，[PyCharm 下载](https://www.jetbrains.com/pycharm/download/) |
+| Git（可选） | 用于克隆仓库，也可以直接下载 ZIP |
+
+#### 3.9.2 使用 Conda 创建环境
+
+打开 **Anaconda Prompt**（在开始菜单中搜索 "Anaconda Prompt"）：
+
+```powershell
+# 1. 创建名为 mars 的 Conda 环境，指定 Python 3.12
+conda create -n mars python=3.12 -y
+
+# 2. 激活环境
+conda activate mars
+
+# 3. 验证 Python 版本
+python --version
+# 应输出 Python 3.12.x
+```
+
+> **为什么选择 Python 3.12？** MARS 需要 Python ≥ 3.10。Python 3.12 稳定且兼容性好，推荐使用。你也可以选择 3.10 或 3.11。
+
+#### 3.9.3 下载项目代码
+
+```powershell
+# 方式一：Git 克隆（推荐）
+git clone https://github.com/igeng/MARS.git
+cd MARS
+
+# 方式二：如果没有 Git，从 GitHub 下载 ZIP 并解压后进入目录
+cd C:\path\to\MARS
+```
+
+#### 3.9.4 安装项目依赖
+
+在已激活 `mars` 环境的 Anaconda Prompt 中：
+
+```powershell
+# 升级 pip
+python -m pip install --upgrade pip
+
+# 安装全部依赖
+pip install -r requirements.txt
+
+# 以开发模式安装项目（推荐，这样 mars 命令可用）
+pip install -e .
+```
+
+> **Conda 用户提示**：MARS 的依赖全部通过 pip 安装即可，不需要用 `conda install`。CrewAI 等核心包在 conda-forge 上可能版本较旧，建议统一使用 pip。
+
+如果 `pymupdf` 安装失败，可以跳过——系统会自动回退到 PyPDF2：
+```powershell
+pip install pymupdf --no-build-isolation
+```
+
+#### 3.9.5 配置 API Key
+
+```powershell
+# 复制环境变量模板
+copy .env.example .env
+
+# 用记事本编辑（或在 PyCharm 中直接编辑）
+notepad .env
+```
+
+在 `.env` 中填入你的 API Key（至少需要一个 LLM 供应商）：
+
+```env
+# 至少填写一个
+DASHSCOPE_API_KEY=sk-xxxxxxxxxxxxxxxx
+DEEPSEEK_API_KEY=sk-xxxxxxxxxxxxxxxx
+MOONSHOT_API_KEY=sk-xxxxxxxxxxxxxxxx
+ZHIPU_API_KEY=xxxxxxxx.xxxxxxxxxxxxxxxx
+
+# 改为你已配置 Key 的供应商
+DEFAULT_LLM_PROVIDER=qwen
+```
+
+#### 3.9.6 在 PyCharm 中配置项目
+
+**步骤 1：打开项目**
+
+1. 启动 PyCharm
+2. 选择 **File → Open**
+3. 选择 MARS 项目根目录（包含 `main.py` 的文件夹）
+4. 点击 **OK** 打开
+
+**步骤 2：配置 Conda 解释器**
+
+1. 打开 **File → Settings**（或 `Ctrl+Alt+S`）
+2. 导航到 **Project: MARS → Python Interpreter**
+3. 点击右上角齿轮图标 ⚙️ → **Add Interpreter → Add Local Interpreter**
+4. 在左侧选择 **Conda Environment**
+5. 选择 **Use existing environment**
+6. 在下拉列表中选择 `mars`（即刚才创建的 Conda 环境）
+7. 点击 **OK** 确认
+
+> 如果下拉列表中没有看到 `mars` 环境，点击 **...** 按钮手动定位 Conda 可执行文件路径，通常在：
+> - Anaconda: `C:\Users\<你的用户名>\anaconda3\Scripts\conda.exe`
+> - Miniconda: `C:\Users\<你的用户名>\miniconda3\Scripts\conda.exe`
+
+**步骤 3：配置环境变量（可选）**
+
+PyCharm 中运行代码时，`.env` 文件会被 `pydantic-settings` 自动加载。如果需要额外配置：
+
+1. 打开 **Run → Edit Configurations**
+2. 选择或新建一个 Python 配置
+3. 在 **Environment variables** 中可以添加变量，或者在 **EnvFile** 插件中指定 `.env` 文件路径
+
+> 一般情况下无需手动配置——MARS 的 `settings.py` 会自动从项目根目录加载 `.env` 文件。
+
+**步骤 4：配置 Terminal（推荐）**
+
+让 PyCharm 内置终端自动使用 Conda 环境：
+
+1. 打开 **File → Settings → Tools → Terminal**
+2. 将 **Shell path** 设置为：
+   ```
+   cmd.exe /K "C:\Users\<你的用户名>\anaconda3\Scripts\activate.bat mars"
+   ```
+   或者对于 Miniconda：
+   ```
+   cmd.exe /K "C:\Users\<你的用户名>\miniconda3\Scripts\activate.bat mars"
+   ```
+3. 点击 **OK**，重新打开 Terminal 面板即可看到 `(mars)` 前缀
+
+#### 3.9.7 在 PyCharm 中运行 MARS
+
+**方式一：通过 Terminal 面板运行 CLI 命令**
+
+点击 PyCharm 底部的 **Terminal** 标签，在终端中直接输入：
+
+```powershell
+# 验证安装
+mars check
+
+# 基础检索
+mars search "federated learning with differential privacy"
+
+# 完整研究流程
+mars full "联邦学习隐私保护技术"
+
+# 启动 API 服务器
+mars api --port 8000
+```
+
+**方式二：右键运行 main.py**
+
+1. 在项目文件树中找到 `main.py`
+2. 右键点击 → **Run 'main'**
+3. 首次运行时 PyCharm 会自动创建运行配置
+
+如需传入命令行参数：
+
+1. 打开 **Run → Edit Configurations**
+2. 选择 `main` 配置
+3. 在 **Parameters** 中填入参数，例如：
+   ```
+   search "graph neural network for recommendation"
+   ```
+4. 点击 **OK**，然后点击运行按钮 ▶️
+
+**方式三：配置快捷运行配置**
+
+为常用命令创建专门的运行配置：
+
+1. **Run → Edit Configurations → + → Python**
+2. 配置示例：
+
+| 配置项 | 值 |
+|--------|-----|
+| Name | MARS - Full Research |
+| Script path | `$ProjectFileDir$/main.py` |
+| Parameters | `full "你的研究主题"` |
+| Working directory | `$ProjectFileDir$` |
+| Python interpreter | 选择 `mars` Conda 环境 |
+
+3. 点击 **OK**，之后可以从工具栏的下拉菜单快速选择并运行
+
+#### 3.9.8 在 PyCharm 中运行测试
+
+1. 在项目文件树中右键点击 `tests/` 文件夹
+2. 选择 **Run 'pytest in tests'**
+3. 或者在 Terminal 中运行：
+
+```powershell
+python -m pytest tests/ -v
+```
+
+> 所有测试无需 API Key 即可通过（工具调用已 mock）。
+
+#### 3.9.9 在 PyCharm 中调试
+
+1. 在任意 `.py` 文件中点击行号左侧设置断点
+2. 右键点击 `main.py` → **Debug 'main'**（或按 `Shift+F9`）
+3. 程序会在断点处暂停，你可以查看变量值、调用栈等
+
+**调试 API 服务器**：
+
+1. 创建运行配置，Parameters 填写 `api --port 8000`
+2. 使用 Debug 模式运行
+3. 在浏览器中访问 `http://localhost:8000/docs` 触发请求
+4. 断点会在对应的路由处理函数中命中
+
+#### 3.9.10 常见问题
+
+**Q: Conda 环境中 `mars` 命令找不到？**
+
+确保已在 Conda 环境中以开发模式安装：
+```powershell
+conda activate mars
+pip install -e .
+```
+
+或直接使用 `python main.py` 代替 `mars` 命令。
+
+**Q: PyCharm 无法识别项目中的模块导入？**
+
+1. 确认已正确选择 Conda `mars` 环境作为 Python Interpreter
+2. 右键点击项目根目录 → **Mark Directory as → Sources Root**
+3. 或者执行 `pip install -e .`，让 PyCharm 能正确解析 `mars` 包
+
+**Q: PyCharm Terminal 没有自动激活 Conda 环境？**
+
+- 检查 Settings → Tools → Terminal 中的 Shell path 配置是否正确
+- 或者每次在 Terminal 中手动执行 `conda activate mars`
+
+**Q: 安装依赖时出现 "solving environment" 很慢？**
+
+MARS 的依赖通过 pip 安装，不需要 `conda install`。直接使用：
+```powershell
+conda activate mars
+pip install -r requirements.txt
+```
 
 ---
 
@@ -919,7 +1164,13 @@ mars full "topic" 2>&1 | tee research.log
 
 确保已激活虚拟环境，并以开发模式安装：
 ```bash
-source .venv/bin/activate  # Windows: .venv\Scripts\activate
+source .venv/bin/activate  # Windows venv: .venv\Scripts\activate
+pip install -e .
+```
+
+Conda 用户：
+```powershell
+conda activate mars
 pip install -e .
 ```
 
