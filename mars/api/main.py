@@ -7,9 +7,9 @@ Supports search, analysis, connection, and full-research workflows.
 
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, Field
 
 from mars.config.settings import settings
 
@@ -68,7 +68,7 @@ def create_app() -> FastAPI:
         version="0.1.0",
     )
 
-    # ---- CORS ----
+    # ---- CORS (restrict allow_origins in production) ----
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["*"],

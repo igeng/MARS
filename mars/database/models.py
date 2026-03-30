@@ -7,7 +7,7 @@ previously retrieved papers can be served from a local store.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy import (
     Column,
@@ -47,8 +47,8 @@ class CCFVenue(Base):
     venue_type = Column(String(20), nullable=False)  # conference / journal
     domains = Column(Text, nullable=False)  # comma-separated domain list
     dblp_url = Column(String(512), default="")
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
     def __repr__(self) -> str:
         return f"<CCFVenue [{self.ccf_rank}] {self.name}>"
@@ -76,7 +76,7 @@ class Paper(Base):
     source = Column(String(50), default="")    # dblp / semantic_scholar / arxiv
     semantic_scholar_id = Column(String(64), default="", index=True)
     relevance_score = Column(Float, default=0.0)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     def __repr__(self) -> str:
         return f"<Paper {self.title[:50]}>"
