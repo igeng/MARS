@@ -34,7 +34,7 @@ MARS 是一个基于多智能体架构的学术文献智能检索与分析系统
 - 🔍 **论文检索**：从 DBLP、Semantic Scholar、arXiv 三大学术数据库同时搜索
 - 📊 **深度分析**：提取论文的核心贡献、研究方法、实验设计
 - 🔗 **关联分析**：构建引用网络，发现研究趋势和热点
-- 📝 **综述生成**：自动生成 ≥3000 字英文综述并翻译成中文（双语输出）
+- 📝 **综述生成**：自动生成 ≥ 3000 字英文综述并翻译成中文（双语输出）
 - ⭐ **质量评估**：多维度评估论文学术质量
 
 ### 1.2 启动方式
@@ -761,7 +761,7 @@ mars search "deep reinforcement learning" --max-results 20
 mars search "deep reinforcement learning" -n 20
 ```
 
-**输出**：论文列表，包含标题、作者、发表期刊/会议、年份、引用次数、URL。每次运行在 `output/search_<时间戳>/` 目录下生成5份文件：`prompt.txt`、`run.log`、`domain_analysis.json`、`review_en.md`（英文综述）、`review_zh.md`（中文翻译）以及 `paper_search.json`。
+**输出**：论文列表，包含标题、作者、发表期刊/会议、年份、引用次数、URL。每次运行在 `output/search_<时间戳>/` 目录下生成6份文件：`prompt.txt`、`run.log`、`domain_analysis.json`、`paper_search.json`、`review_en.md`（英文综述 ≥ 3000 字）、`review_zh.md`（中文翻译）。
 
 ### 6.3 深度分析
 
@@ -806,7 +806,7 @@ mars full "联邦学习隐私保护技术"
 3. 深度分析 → 提取 Top 20 论文的核心内容（analysis_results.json）
 4. 关联分析 → 构建引用网络，识别趋势（connection_analysis.json）
 5. 质量评估 → 多维度评分（quality_evaluation.json）
-6. 综述生成 → 生成英文综述 ≥3000 字（review_en.md）→ 翻译为中文综述（review_zh.md）
+6. 综述生成 → 生成英文综述 ≥ 3000 字（review_en.md）→ 翻译为中文综述（review_zh.md）
 
 **输出**：完整的研究报告，保存到 `output/full_<时间戳>/` 目录下的7份文件。
 
@@ -1013,14 +1013,14 @@ print(result)
   │
   ├─ Step 3: Summarizer Agent（英文综述）
   │   ├─ 综合领域分析和检索结果
-  │   └─ 输出: review_en.md（英文文献综述 ≥3000 字）
+  │   └─ 输出: review_en.md（英文文献综述 ≥ 3000 字）
   │
   └─ Step 4: Summarizer Agent（中文翻译）
       ├─ 将英文综述翻译为高质量中文
       └─ 输出: review_zh.md（中文文献综述）
 ```
 
-**耗时**：约 3-6 分钟
+**耗时**：约 3-6 分钟（含双语综述生成）
 
 ### 9.2 深度分析流程
 
@@ -1076,7 +1076,7 @@ print(result)
   │   └─ Evaluator → 质量评估（quality_evaluation.json，Top 20）
   │
   └─ Phase 3: 综合（5-8 分钟）
-      ├─ Summarizer → 英文综述（review_en.md，≥3000 字）
+      ├─ Summarizer → 英文综述（review_en.md，≥ 3000 字）
       └─ Summarizer → 中文翻译（review_zh.md）
 ```
 
@@ -1097,7 +1097,7 @@ print(result)
 | `analysis_results.json` | 论文深度分析结果 | analyze、full |
 | `connection_analysis.json` | 引用网络和主题聚类 | connect、full |
 | `quality_evaluation.json` | 论文质量评估评分 | analyze、full |
-| `review_en.md` | 英文学术综述报告（≥3000 字） | search、connect、full |
+| `review_en.md` | 英文学术综述报告（≥ 3000 字） | search、connect、full |
 | `review_zh.md` | 中文综述报告（英文版的高质量翻译） | search、connect、full |
 
 ---

@@ -62,7 +62,7 @@ MARS is an automated academic literature search and deep analysis system built o
 ### 1. Basic Search (基础检索)
 ```
 User topic → Researcher (domain analysis) → Searcher (50 papers)
-          → Summarizer (English review ≥3000 words → Chinese translation)
+          → Summarizer (English review ≥ 3000 words → Chinese translation)
           → Output: paper_search.json + review_en.md + review_zh.md
 ```
 
@@ -83,7 +83,7 @@ User topic
   → Researcher (domain analysis)
   → Searcher (50 papers)
   → Analyzer (top 20) + Connector (all 50) + Evaluator (top 20)
-  → Summarizer (English review ≥3000 words → Chinese translation)
+  → Summarizer (English review ≥ 3000 words → Chinese translation)
   → Output: 7 files including bilingual comprehensive review
 ```
 
