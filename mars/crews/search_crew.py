@@ -43,7 +43,7 @@ def create_search_crew(topic: str, max_results: int | None = None) -> Crew:
         tasks=[domain_analysis_task, paper_search_task],
         process=Process.sequential,
         verbose=True,
-        memory=True,
+        memory=settings.ENABLE_MEMORY,
     )
 
 

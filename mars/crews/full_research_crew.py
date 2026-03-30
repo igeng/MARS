@@ -97,7 +97,7 @@ def create_full_research_crew(topic: str) -> Crew:
         ],
         process=Process.sequential,
         verbose=True,
-        memory=True,
+        memory=settings.ENABLE_MEMORY,
     )
 
 

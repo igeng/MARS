@@ -51,7 +51,7 @@ def create_analysis_crew(
         tasks=[deep_analysis_task, quality_evaluation_task],
         process=Process.sequential,
         verbose=True,
-        memory=True,
+        memory=settings.ENABLE_MEMORY,
     )
 
 

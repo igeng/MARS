@@ -50,6 +50,12 @@ class MarsSettings(BaseSettings):
     LOG_LEVEL: str = "INFO"
     OUTPUT_DIR: Path = Path("./output")
 
+    # ---- Crew memory ----
+    # Set to True only when an OpenAI-compatible embedding API key is available.
+    # CrewAI's built-in memory layer defaults to OpenAI embeddings; enabling this
+    # without a compatible key raises a CHROMA_OPENAI_API_KEY validation error.
+    ENABLE_MEMORY: bool = False
+
     # ---- Database ----
     DATABASE_URL: str = "sqlite:///./mars.db"
 
