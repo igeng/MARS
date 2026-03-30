@@ -134,8 +134,14 @@ def get_deepseek_llm(model: str | None = None, temperature: float = 0.3) -> Chat
     )
 
 
-def get_kimi_llm(model: str | None = None, temperature: float = 0.3) -> ChatOpenAI:
-    """Kimi model via Moonshot AI API (OpenAI-compatible)."""
+def get_kimi_llm(model: str | None = None, temperature: float = 1.0) -> ChatOpenAI:
+    """Kimi model via Moonshot AI API (OpenAI-compatible).
+
+    The default ``kimi-k2.5`` model only accepts ``temperature=1``; the
+    default value is therefore set to ``1.0`` here.  If you switch to a
+    different Kimi model that supports a wider range, pass *temperature*
+    explicitly.
+    """
     return _openai_compatible_llm(
         model=model or settings.KIMI_MODEL,
         api_key=settings.MOONSHOT_API_KEY,
@@ -176,10 +182,11 @@ _PROVIDER_MAP = {
 class _CrewAIProviderCfg(NamedTuple):
     """Configuration needed to construct a crewai.LLM for a given provider."""
 
-    model_prefix: str    # LiteLLM provider prefix (e.g. "openai", "deepseek")
-    model_attr: str      # Settings attribute name holding the default model name
-    key_attr: str        # Settings attribute name holding the API key
-    base_url: str        # Endpoint URL for the provider
+    model_prefix: str             # LiteLLM provider prefix (e.g. "openai", "deepseek")
+    model_attr: str               # Settings attribute name holding the default model name
+    key_attr: str                 # Settings attribute name holding the API key
+    base_url: str                 # Endpoint URL for the provider
+    temperature_override: float | None = None  # When set, always use this temperature
 
 
 _CREWAI_PROVIDER_CFG: dict[str, _CrewAIProviderCfg] = {
@@ -189,9 +196,10 @@ _CREWAI_PROVIDER_CFG: dict[str, _CrewAIProviderCfg] = {
     # are not reliably handled by LiteLLM and cause "LLM Provider NOT
     # provided" errors when the installed provider SDK intercepts the call
     # and strips the prefix before the LiteLLM fallback path runs.
+    # kimi-k2.5 only accepts temperature=1; the override enforces this.
     "qwen":     _CrewAIProviderCfg("openai",   "QWEN_MODEL",    "DASHSCOPE_API_KEY", "https://dashscope.aliyuncs.com/compatible-mode/v1"),
     "deepseek": _CrewAIProviderCfg("deepseek", "DEEPSEEK_MODEL", "DEEPSEEK_API_KEY",  "https://api.deepseek.com/v1"),
-    "kimi":     _CrewAIProviderCfg("openai",   "KIMI_MODEL",     "MOONSHOT_API_KEY",  "https://api.moonshot.cn/v1"),
+    "kimi":     _CrewAIProviderCfg("openai",   "KIMI_MODEL",     "MOONSHOT_API_KEY",  "https://api.moonshot.cn/v1", 1.0),
     "glm":      _CrewAIProviderCfg("openai",   "GLM_MODEL",      "ZHIPU_API_KEY",     "https://open.bigmodel.cn/api/paas/v4"),
 }
 
@@ -200,11 +208,14 @@ def _get_crewai_llm(provider: str, model: str | None = None, temperature: float 
     """Return a crewai.LLM for *provider*, optionally overriding the model name."""
     cfg = _CREWAI_PROVIDER_CFG[provider]
     model_name = model or getattr(settings, cfg.model_attr)
+    effective_temperature = (
+        cfg.temperature_override if cfg.temperature_override is not None else temperature
+    )
     return _crewai_compatible_llm(
         model=f"{cfg.model_prefix}/{model_name}",
         api_key=getattr(settings, cfg.key_attr),
         base_url=cfg.base_url,
-        temperature=temperature,
+        temperature=effective_temperature,
     )
 
 
