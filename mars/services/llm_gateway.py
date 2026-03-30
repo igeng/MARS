@@ -8,13 +8,29 @@ the most appropriate LLM provider / model.
 When the preferred provider's API key is not configured the gateway
 automatically falls back to any provider that *does* have a key,
 so users with only one or two keys can still use the full system.
+
+Two types of LLM objects are returned:
+
+* :func:`get_llm` and the per-provider helpers (``get_qwen_llm`` etc.)
+  return a :class:`langchain_openai.ChatOpenAI` instance for use in
+  tools that call the LLM directly (e.g. ``KeywordExpanderTool``).
+
+* :func:`get_llm_by_task` returns a :class:`crewai.LLM` instance for
+  use in CrewAI ``Agent`` objects.  CrewAI ≥0.80 uses either a native
+  provider SDK or LiteLLM internally; both require the model string to
+  carry a provider prefix (e.g. ``dashscope/<model>`` for DashScope,
+  ``moonshot/<model>`` for Moonshot/Kimi) together with a ``base_url``
+  pointing at the correct endpoint.  Passing a raw ``ChatOpenAI`` object
+  causes CrewAI/LiteLLM to extract only the bare model name, which then
+  fails with "LLM Provider NOT provided".
 """
 
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import Any, NamedTuple
 
+from crewai import LLM
 from langchain_openai import ChatOpenAI
 
 from mars.config.settings import settings
@@ -23,7 +39,7 @@ logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
-# Low-level factory
+# Low-level factories
 # ---------------------------------------------------------------------------
 
 def _openai_compatible_llm(
@@ -33,7 +49,10 @@ def _openai_compatible_llm(
     temperature: float = 0.3,
     **kwargs: Any,
 ) -> ChatOpenAI:
-    """Return a ChatOpenAI instance pointed at an OpenAI-compatible endpoint."""
+    """Return a ChatOpenAI instance pointed at an OpenAI-compatible endpoint.
+
+    Used for direct LLM calls inside tools (e.g. ``KeywordExpanderTool``).
+    """
     return ChatOpenAI(
         model=model,
         api_key=api_key,
@@ -43,8 +62,49 @@ def _openai_compatible_llm(
     )
 
 
+def _crewai_compatible_llm(
+    model: str,
+    api_key: str,
+    base_url: str,
+    temperature: float = 0.3,
+) -> LLM:
+    """Return a crewai.LLM instance pointed at an OpenAI-compatible endpoint.
+
+    Used when assigning an LLM to a CrewAI ``Agent``.  CrewAI ≥0.80 passes
+    LLM calls through either a native provider SDK or LiteLLM.  The model
+    string must carry the correct provider prefix so that CrewAI routes the
+    call to the right backend (e.g. ``dashscope/<model>`` for DashScope,
+    ``moonshot/<model>`` for Moonshot/Kimi, ``deepseek/<model>`` for DeepSeek,
+    and ``openai/<model>`` + custom ``base_url`` for other OpenAI-compatible
+    endpoints such as Zhipu AI).  Providers without a native crewai driver
+    (moonshot, zhipu) rely on LiteLLM (``pip install litellm``).
+
+    When *api_key* is falsy (either ``None`` or an empty string ``""``, which
+    both occur in test environments where no key is configured) the function
+    bypasses native-SDK API-key validation by requesting the LiteLLM path so
+    that the LLM object can always be constructed.  It will still raise an auth
+    error if an actual API call is made without a valid key.
+    """
+    # Native provider SDKs validate the API key at construction time.
+    # When no key is available yet (api_key is None or ""), fall back to the
+    # LiteLLM code path, which defers validation to call time.
+    if api_key:
+        return LLM(
+            model=model,
+            api_key=api_key,
+            base_url=base_url,
+            temperature=temperature,
+        )
+    return LLM(
+        model=model,
+        base_url=base_url,
+        temperature=temperature,
+        is_litellm=True,
+    )
+
+
 # ---------------------------------------------------------------------------
-# Provider helpers
+# Provider helpers  (return ChatOpenAI – for direct tool invocation)
 # ---------------------------------------------------------------------------
 
 def get_qwen_llm(model: str | None = None, temperature: float = 0.3) -> ChatOpenAI:
@@ -88,15 +148,54 @@ def get_glm_llm(model: str | None = None, temperature: float = 0.3) -> ChatOpenA
 
 
 # ---------------------------------------------------------------------------
-# Provider map
+# Provider maps
 # ---------------------------------------------------------------------------
 
+# ChatOpenAI factories – used by get_llm() for direct tool invocation.
 _PROVIDER_MAP = {
     "qwen": get_qwen_llm,
     "deepseek": get_deepseek_llm,
     "kimi": get_kimi_llm,
     "glm": get_glm_llm,
 }
+
+# crewai.LLM factories – used by get_llm_by_task() for agent construction.
+# The model_prefix is prepended to the model name so crewai/LiteLLM routes
+# the call to the correct backend:
+#   dashscope/* → crewai native DashScope (China endpoint via base_url override)
+#   deepseek/*  → crewai native DeepSeek
+#   moonshot/*  → LiteLLM Moonshot (requires litellm package)
+#   openai/*    → LiteLLM OpenAI-compatible (custom base_url; used for Zhipu)
+
+
+class _CrewAIProviderCfg(NamedTuple):
+    """Configuration needed to construct a crewai.LLM for a given provider."""
+
+    model_prefix: str    # LiteLLM provider prefix (e.g. "dashscope", "moonshot")
+    model_attr: str      # Settings attribute name holding the default model name
+    key_attr: str        # Settings attribute name holding the API key
+    base_url: str        # Endpoint URL for the provider
+
+
+_CREWAI_PROVIDER_CFG: dict[str, _CrewAIProviderCfg] = {
+    "qwen":     _CrewAIProviderCfg("dashscope", "QWEN_MODEL",    "DASHSCOPE_API_KEY", "https://dashscope.aliyuncs.com/compatible-mode/v1"),
+    "deepseek": _CrewAIProviderCfg("deepseek",  "DEEPSEEK_MODEL", "DEEPSEEK_API_KEY",  "https://api.deepseek.com/v1"),
+    "kimi":     _CrewAIProviderCfg("moonshot",  "KIMI_MODEL",     "MOONSHOT_API_KEY",  "https://api.moonshot.cn/v1"),
+    "glm":      _CrewAIProviderCfg("openai",    "GLM_MODEL",      "ZHIPU_API_KEY",     "https://open.bigmodel.cn/api/paas/v4"),
+}
+
+
+def _get_crewai_llm(provider: str, model: str | None = None, temperature: float = 0.3) -> LLM:
+    """Return a crewai.LLM for *provider*, optionally overriding the model name."""
+    cfg = _CREWAI_PROVIDER_CFG[provider]
+    model_name = model or getattr(settings, cfg.model_attr)
+    return _crewai_compatible_llm(
+        model=f"{cfg.model_prefix}/{model_name}",
+        api_key=getattr(settings, cfg.key_attr),
+        base_url=cfg.base_url,
+        temperature=temperature,
+    )
+
 
 # Maps provider name → the settings attribute that holds its API key.
 _PROVIDER_KEY_ATTR: dict[str, str] = {
@@ -196,19 +295,28 @@ def get_llm(
 
 # Maps each MARS agent role (lowercase key) to (provider, model_override).
 # ``None`` for model_override means "use the provider default".
+# Preferred providers are qwen and kimi – both work without extra keys.
+# deepseek/glm entries fall back automatically when those keys are absent.
 _AGENT_LLM_MAP: dict[str, tuple[str, str | None]] = {
-    "researcher": ("qwen", None),        # Qwen-Max – strong reasoning
-    "searcher": ("deepseek", None),       # DeepSeek-V3 – balanced
-    "analyzer": ("kimi", None),           # Kimi – long-context
-    "connector": ("glm", None),           # GLM-4-Plus – relation reasoning
-    "summarizer": ("qwen", None),         # Qwen-Max – long text generation
-    "evaluator": ("deepseek", None),      # DeepSeek-V3 – evaluation tasks
+    "researcher": ("qwen", None),     # Qwen – strong reasoning
+    "searcher": ("kimi", None),       # Kimi – long-context search synthesis
+    "analyzer": ("kimi", None),       # Kimi – long-context deep analysis
+    "connector": ("qwen", None),      # Qwen – relation reasoning
+    "summarizer": ("qwen", None),     # Qwen – long text generation
+    "evaluator": ("kimi", None),      # Kimi – evaluation tasks
 }
 
 
-def get_llm_by_task(agent_role: str, temperature: float = 0.3) -> ChatOpenAI:
+def get_llm_by_task(agent_role: str, temperature: float = 0.3) -> LLM:
     """
-    Return the LLM instance configured for a specific MARS agent role.
+    Return a :class:`crewai.LLM` instance configured for a specific MARS agent role.
+
+    Returns a ``crewai.LLM`` object rather than a plain ``ChatOpenAI``.
+    CrewAI ≥0.80 routes agent calls through its native provider SDKs or
+    LiteLLM.  Both require the model string to include the correct provider
+    prefix (e.g. ``dashscope/qwen3.5-flash``) and a ``base_url`` pointing
+    at the custom endpoint.  Using ``crewai.LLM`` ensures these are set
+    correctly for every provider.
 
     If the preferred provider for the role has no API key, the gateway
     transparently falls back to an available provider.
@@ -228,4 +336,8 @@ def get_llm_by_task(agent_role: str, temperature: float = 0.3) -> ChatOpenAI:
             f"Choose from: {list(_AGENT_LLM_MAP.keys())}"
         )
     provider, model = _AGENT_LLM_MAP[role_key]
-    return get_llm(provider=provider, model=model, temperature=temperature)
+    resolved = _resolve_provider(provider)
+    # When falling back, do not pass the caller's model override because
+    # that model name may be invalid for the fallback provider.
+    effective_model = model if resolved == provider else None
+    return _get_crewai_llm(provider=resolved, model=effective_model, temperature=temperature)

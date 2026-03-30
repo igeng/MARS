@@ -2,6 +2,10 @@
 crewai>=0.80.0
 crewai-tools>=0.17.0
 
+# LLM routing – required for Moonshot (Kimi) and Zhipu AI (GLM) providers,
+# which are not natively supported by the crewai SDK and fall back to LiteLLM.
+litellm>=1.50.0
+
 # LangChain integrations (required by CrewAI agents)
 langchain-openai>=0.2.0
 
