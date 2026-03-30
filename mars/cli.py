@@ -24,7 +24,7 @@ app = typer.Typer(
     help="MARS - Multi-Agent Research System | 多智能体学术文献智能检索与分析系统",
     add_completion=False,
 )
-console = Console()
+console = Console(legacy_windows=False)
 
 
 def _print_banner() -> None:
