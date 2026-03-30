@@ -28,6 +28,7 @@ from mars.tasks.task_definitions import (
     create_connection_analysis_task,
     create_deep_analysis_task,
     create_domain_analysis_task,
+    create_english_review_task,
     create_paper_search_task,
     create_quality_evaluation_task,
     create_review_generation_task,
@@ -72,8 +73,8 @@ def create_full_research_crew(topic: str) -> Crew:
         evaluator, limit=analysis_limit, context=[deep_analysis_task]
     )
 
-    # ---- Sequential phase 2: Comprehensive review ----
-    comprehensive_review_task = create_review_generation_task(
+    # ---- Sequential phase 2: Comprehensive bilingual reviews ----
+    chinese_review_task = create_review_generation_task(
         summarizer,
         topic,
         context=[
@@ -82,6 +83,18 @@ def create_full_research_crew(topic: str) -> Crew:
             deep_analysis_task,
             connection_analysis_task,
             quality_evaluation_task,
+        ],
+    )
+    english_review_task = create_english_review_task(
+        summarizer,
+        topic,
+        context=[
+            domain_analysis_task,
+            bulk_search_task,
+            deep_analysis_task,
+            connection_analysis_task,
+            quality_evaluation_task,
+            chinese_review_task,
         ],
     )
 
@@ -93,7 +106,8 @@ def create_full_research_crew(topic: str) -> Crew:
             deep_analysis_task,
             connection_analysis_task,
             quality_evaluation_task,
-            comprehensive_review_task,
+            chinese_review_task,
+            english_review_task,
         ],
         process=Process.sequential,
         verbose=True,

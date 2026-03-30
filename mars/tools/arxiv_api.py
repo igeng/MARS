@@ -11,17 +11,45 @@ from __future__ import annotations
 import json
 import re
 import xml.etree.ElementTree as ET
-from typing import Any
+from typing import Any, Optional
 from urllib.parse import quote_plus
 
 import requests
 from crewai.tools import BaseTool
+from pydantic import BaseModel, Field, model_validator
 
 from mars.utils.retry import retry_on_network_error
 
 ARXIV_SEARCH_URL = "https://export.arxiv.org/api/query"
 ARXIV_NS = "http://www.w3.org/2005/Atom"
 DEFAULT_MAX_RESULTS = 10
+
+
+class ArXivSearchToolSchema(BaseModel):
+    """Input schema for ArXivSearchTool.
+
+    Accepts either a pre-encoded ``query_json`` string or individual fields.
+    """
+
+    query_json: str = Field(
+        description=(
+            "JSON string with keys: 'query' (required, can include field "
+            "prefixes like ti:, au:, abs:), "
+            "'max_results' (optional, default 10)."
+        )
+    )
+
+    @model_validator(mode="before")
+    @classmethod
+    def _coerce_direct_args(cls, values: Any) -> Any:
+        if not isinstance(values, dict):
+            return values
+        if "query_json" not in values and "query" in values:
+            payload: dict[str, Any] = {"query": values["query"]}
+            if values.get("max_results") is not None:
+                payload["max_results"] = values["max_results"]
+            return {"query_json": json.dumps(payload)}
+        return values
 
 
 @retry_on_network_error(max_retries=3)
@@ -42,6 +70,7 @@ class ArXivSearchTool(BaseTool):
         "'max_results' (optional, default 10). "
         "Returns paper metadata including abstract and PDF URL."
     )
+    args_schema: type[ArXivSearchToolSchema] = ArXivSearchToolSchema
 
     def _run(self, query_json: str) -> str:
         try:

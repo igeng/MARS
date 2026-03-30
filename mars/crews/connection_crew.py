@@ -16,6 +16,7 @@ from mars.agents.summarizer import create_summarizer_agent
 from mars.config import settings
 from mars.tasks.task_definitions import (
     create_connection_analysis_task,
+    create_english_review_task,
     create_review_generation_task,
 )
 
@@ -35,13 +36,16 @@ def create_connection_crew(papers_info: str, topic: str) -> Crew:
     connection_analysis_task = create_connection_analysis_task(
         connector, topic, papers_info=papers_info,
     )
-    review_generation_task = create_review_generation_task(
+    chinese_review_task = create_review_generation_task(
         summarizer, topic, context=[connection_analysis_task],
+    )
+    english_review_task = create_english_review_task(
+        summarizer, topic, context=[connection_analysis_task, chinese_review_task],
     )
 
     return Crew(
         agents=[connector, summarizer],
-        tasks=[connection_analysis_task, review_generation_task],
+        tasks=[connection_analysis_task, chinese_review_task, english_review_task],
         process=Process.sequential,
         verbose=True,
         memory=settings.ENABLE_MEMORY,
