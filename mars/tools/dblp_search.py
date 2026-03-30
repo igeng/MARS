@@ -15,8 +15,17 @@ from typing import Any
 import requests
 from crewai.tools import BaseTool
 
+from mars.utils.retry import retry_on_network_error
+
 DBLP_SEARCH_URL = "https://dblp.org/search/publ/api"
 DEFAULT_MAX_RESULTS = 20
+
+
+@retry_on_network_error(max_retries=3)
+def _dblp_get(params: dict) -> requests.Response:
+    response = requests.get(DBLP_SEARCH_URL, params=params, timeout=15)
+    response.raise_for_status()
+    return response
 
 
 class DBLPSearchTool(BaseTool):
@@ -56,8 +65,7 @@ class DBLPSearchTool(BaseTool):
         }
 
         try:
-            response = requests.get(DBLP_SEARCH_URL, params=api_params, timeout=15)
-            response.raise_for_status()
+            response = _dblp_get(api_params)
             data = response.json()
         except requests.RequestException as exc:
             return f"DBLP API request failed: {exc}"

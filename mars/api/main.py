@@ -7,11 +7,18 @@ Supports search, analysis, connection, and full-research workflows.
 
 from __future__ import annotations
 
-from fastapi import FastAPI
+import logging
+from contextlib import asynccontextmanager
+
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 from mars.config.settings import settings
+from mars.utils.logging_config import setup_logging
+
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Pydantic request / response schemas
@@ -56,6 +63,21 @@ class TaskResponse(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Lifespan (startup / shutdown logic)
+# ---------------------------------------------------------------------------
+
+
+@asynccontextmanager
+async def _lifespan(app: FastAPI):
+    """Run one-time setup when the application starts."""
+    setup_logging()
+    # Ensure output directory exists
+    settings.OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    logger.info("MARS API server starting – output dir: %s", settings.OUTPUT_DIR)
+    yield
+
+
+# ---------------------------------------------------------------------------
 # Application factory
 # ---------------------------------------------------------------------------
 
@@ -66,6 +88,7 @@ def create_app() -> FastAPI:
         title="MARS API",
         description="Multi-Agent Research System – 多智能体学术文献智能检索与分析系统",
         version="0.1.0",
+        lifespan=_lifespan,
     )
 
     # ---- CORS (restrict allow_origins in production) ----
@@ -76,6 +99,25 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    # ---- Global exception handler ----
+    @app.exception_handler(Exception)
+    async def _unhandled_exception_handler(request: Request, exc: Exception):
+        logger.exception("Unhandled error on %s %s", request.method, request.url.path)
+        return JSONResponse(
+            status_code=500,
+            content={
+                "status": "error",
+                "result": f"Internal server error: {exc}",
+            },
+        )
+
+    @app.exception_handler(ValueError)
+    async def _value_error_handler(request: Request, exc: ValueError):
+        return JSONResponse(
+            status_code=400,
+            content={"status": "error", "result": str(exc)},
+        )
 
     # ---- Health check ----
     @app.get("/health")

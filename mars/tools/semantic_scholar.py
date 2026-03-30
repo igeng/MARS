@@ -16,6 +16,7 @@ import requests
 from crewai.tools import BaseTool
 
 from mars.config import settings
+from mars.utils.retry import retry_on_network_error
 
 SS_SEARCH_URL = "https://api.semanticscholar.org/graph/v1/paper/search"
 SS_FIELDS = (
@@ -23,6 +24,13 @@ SS_FIELDS = (
     "externalIds,abstract,openAccessPdf,url"
 )
 DEFAULT_MAX_RESULTS = 20
+
+
+@retry_on_network_error(max_retries=3)
+def _ss_get(url: str, params: dict, headers: dict) -> requests.Response:
+    response = requests.get(url, params=params, headers=headers, timeout=15)
+    response.raise_for_status()
+    return response
 
 
 class SemanticScholarSearchTool(BaseTool):
@@ -75,10 +83,7 @@ class SemanticScholarSearchTool(BaseTool):
             api_params["year"] = year_range
 
         try:
-            response = requests.get(
-                SS_SEARCH_URL, params=api_params, headers=headers, timeout=15
-            )
-            response.raise_for_status()
+            response = _ss_get(SS_SEARCH_URL, params=api_params, headers=headers)
             data = response.json()
         except requests.RequestException as exc:
             return f"Semantic Scholar API request failed: {exc}"

@@ -17,9 +17,18 @@ from urllib.parse import quote_plus
 import requests
 from crewai.tools import BaseTool
 
+from mars.utils.retry import retry_on_network_error
+
 ARXIV_SEARCH_URL = "https://export.arxiv.org/api/query"
 ARXIV_NS = "http://www.w3.org/2005/Atom"
 DEFAULT_MAX_RESULTS = 10
+
+
+@retry_on_network_error(max_retries=3)
+def _arxiv_get(params: dict) -> requests.Response:
+    response = requests.get(ARXIV_SEARCH_URL, params=params, timeout=15)
+    response.raise_for_status()
+    return response
 
 
 class ArXivSearchTool(BaseTool):
@@ -55,8 +64,7 @@ class ArXivSearchTool(BaseTool):
         }
 
         try:
-            response = requests.get(ARXIV_SEARCH_URL, params=api_params, timeout=15)
-            response.raise_for_status()
+            response = _arxiv_get(api_params)
         except requests.RequestException as exc:
             return f"arXiv API request failed: {exc}"
 

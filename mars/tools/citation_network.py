@@ -14,11 +14,19 @@ import requests
 from crewai.tools import BaseTool
 
 from mars.config import settings
+from mars.utils.retry import retry_on_network_error
 
 SS_PAPER_URL = "https://api.semanticscholar.org/graph/v1/paper/{paper_id}"
 SS_REFS_FIELDS = "references.paperId,references.title,references.year,references.citationCount"
 SS_CITES_FIELDS = "citations.paperId,citations.title,citations.year,citations.citationCount"
 DEFAULT_MAX_REFS = 30
+
+
+@retry_on_network_error(max_retries=2)
+def _ss_paper_get(url: str, params: dict, headers: dict) -> requests.Response:
+    response = requests.get(url, params=params, headers=headers, timeout=15)
+    response.raise_for_status()
+    return response
 
 
 class CitationNetworkTool(BaseTool):
@@ -55,13 +63,11 @@ class CitationNetworkTool(BaseTool):
         for pid in paper_ids:
             # Fetch references
             try:
-                resp = requests.get(
+                resp = _ss_paper_get(
                     SS_PAPER_URL.format(paper_id=pid),
                     params={"fields": SS_REFS_FIELDS},
                     headers=headers,
-                    timeout=15,
                 )
-                resp.raise_for_status()
                 data = resp.json()
             except requests.RequestException as exc:
                 continue

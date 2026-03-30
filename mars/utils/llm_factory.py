@@ -7,6 +7,7 @@ tests) continue to work without changes.
 """
 
 from mars.services.llm_gateway import (  # noqa: F401 – re-export
+    get_available_providers,
     get_deepseek_llm,
     get_glm_llm,
     get_kimi_llm,

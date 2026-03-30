@@ -15,8 +15,17 @@ from typing import Any
 import requests
 from crewai.tools import BaseTool
 
+from mars.utils.retry import retry_on_network_error
+
 MAX_PAGES = 20  # limit pages to avoid excessive token use
 MAX_CHARS = 8000  # max characters returned
+
+
+@retry_on_network_error(max_retries=2)
+def _download_pdf(url: str) -> bytes:
+    resp = requests.get(url, timeout=30, stream=True)
+    resp.raise_for_status()
+    return resp.content
 
 
 class PDFParserTool(BaseTool):
@@ -46,9 +55,7 @@ class PDFParserTool(BaseTool):
             return "Error: 'url' parameter is required."
 
         try:
-            resp = requests.get(url, timeout=30, stream=True)
-            resp.raise_for_status()
-            pdf_bytes = resp.content
+            pdf_bytes = _download_pdf(url)
         except requests.RequestException as exc:
             return f"Failed to download PDF from '{url}': {exc}"
 
