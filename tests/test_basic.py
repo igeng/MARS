@@ -302,12 +302,10 @@ class TestFileManagerTools:
             writer = FileWriterTool()
             reader = FileReaderTool()
 
-            write_result = writer._run(
-                json.dumps({"filename": "test_output.txt", "content": "Hello MARS!"})
-            )
+            write_result = writer._run(filename="test_output.txt", content="Hello MARS!")
             assert "written successfully" in write_result
 
-            read_result = reader._run(json.dumps({"filename": "test_output.txt"}))
+            read_result = reader._run(filename="test_output.txt")
             assert "Hello MARS!" in read_result
         finally:
             settings.OUTPUT_DIR = original_dir
@@ -320,7 +318,7 @@ class TestFileManagerTools:
         settings.OUTPUT_DIR = tmp_path
         try:
             reader = FileReaderTool()
-            result = reader._run(json.dumps({"filename": "nonexistent.txt"}))
+            result = reader._run(filename="nonexistent.txt")
             assert "not found" in result
         finally:
             settings.OUTPUT_DIR = original_dir
@@ -334,14 +332,7 @@ class TestFileManagerTools:
         settings.OUTPUT_DIR = tmp_path
         try:
             writer = FileWriterTool()
-            result = writer._run(
-                json.dumps(
-                    {
-                        "filename": "../../etc/passwd",
-                        "content": "malicious content",
-                    }
-                )
-            )
+            result = writer._run(filename="../../etc/passwd", content="malicious content")
             # Should write to tmp_path/passwd, not /etc/passwd
             assert (tmp_path / "passwd").exists()
             assert not (tmp_path / "../../etc" / "passwd").exists()

@@ -3,8 +3,8 @@ Search Crew - 基础检索流程
 
 Flow:
   User topic → Researcher Agent (domain analysis + venue recommendation)
-             → Searcher Agent (paper retrieval + initial ranking)
-             → Summarizer Agent (Chinese review + English review)
+             → Searcher Agent (paper retrieval + initial ranking, saves paper_search.json)
+             → Summarizer Agent (English review → Chinese translation)
              → Return paper list and bilingual reviews
 """
 
@@ -42,15 +42,17 @@ def create_search_crew(topic: str, max_results: int | None = None) -> Crew:
     paper_search_task = create_paper_search_task(
         searcher, topic, max_papers, context=[domain_analysis_task]
     )
-    chinese_review_task = create_review_generation_task(
+    # Generate English review first (source papers are in English)
+    english_review_task = create_english_review_task(
         summarizer,
         topic,
         context=[domain_analysis_task, paper_search_task],
     )
-    english_review_task = create_english_review_task(
+    # Then translate English review to Chinese
+    chinese_review_task = create_review_generation_task(
         summarizer,
         topic,
-        context=[domain_analysis_task, paper_search_task, chinese_review_task],
+        context=[domain_analysis_task, paper_search_task, english_review_task],
     )
 
     return Crew(
@@ -58,8 +60,8 @@ def create_search_crew(topic: str, max_results: int | None = None) -> Crew:
         tasks=[
             domain_analysis_task,
             paper_search_task,
-            chinese_review_task,
             english_review_task,
+            chinese_review_task,
         ],
         process=Process.sequential,
         verbose=True,
