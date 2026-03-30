@@ -32,7 +32,8 @@ def create_domain_analysis_task(
             f"2. 提取3-8个核心关键词（包含英文）\n"
             f"3. 使用keyword_expander工具扩展关键词\n"
             f"4. 使用ccf_database_query工具查询相关期刊/会议\n"
-            f"5. 推荐Top-5最相关的期刊/会议，注明CCF等级\n\n"
+            f"5. 推荐Top-5最相关的期刊/会议，注明CCF等级\n"
+            f"6. 使用file_writer工具将结果保存到domain_analysis.json\n\n"
             f"输出格式要求：结构化的JSON格式，包含research_domain、"
             f"sub_domains、keywords、recommended_venues字段。"
         ),
@@ -72,7 +73,8 @@ def create_paper_search_task(
             f"3. 使用semantic_scholar_search工具补充检索（按引用量过滤）\n"
             f"4. 使用arxiv_search工具检索最新预印本\n"
             f"5. 合并去重，按相关性和质量排序\n"
-            f"6. 返回最多{max_papers}篇论文的结构化列表\n\n"
+            f"6. 返回最多{max_papers}篇论文的结构化列表\n"
+            f"7. 使用file_writer工具将检索结果保存到paper_search.json\n\n"
             f"输出要求：每篇论文包含title、authors、venue、year、"
             f"citation_count（如有）、url、relevance_reason。"
         ),
