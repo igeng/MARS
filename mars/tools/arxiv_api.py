@@ -18,6 +18,7 @@ import requests
 from crewai.tools import BaseTool
 from pydantic import BaseModel, Field, model_validator
 
+from mars.config.settings import settings
 from mars.utils.retry import retry_on_network_error
 
 ARXIV_SEARCH_URL = "https://export.arxiv.org/api/query"
@@ -54,7 +55,7 @@ class ArXivSearchToolSchema(BaseModel):
 
 @retry_on_network_error(max_retries=3)
 def _arxiv_get(params: dict) -> requests.Response:
-    response = requests.get(ARXIV_SEARCH_URL, params=params, timeout=15)
+    response = requests.get(ARXIV_SEARCH_URL, params=params, timeout=settings.ARXIV_SEARCH_TIMEOUT)
     response.raise_for_status()
     return response
 

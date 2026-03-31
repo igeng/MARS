@@ -43,6 +43,9 @@ class MarsSettings(BaseSettings):
     SEMANTIC_SCHOLAR_API_KEY: str = ""
     MAX_PAPERS_PER_SEARCH: int = Field(default=50, gt=0)
     MAX_PAPERS_FOR_ANALYSIS: int = Field(default=20, gt=0)
+    # HTTP read timeout (seconds) for arXiv API requests.
+    # Increase if you experience frequent timeout errors on slow networks.
+    ARXIV_SEARCH_TIMEOUT: int = Field(default=30, gt=0)
 
     # ---- Application ----
     DEFAULT_LLM_PROVIDER: str = "qwen"
