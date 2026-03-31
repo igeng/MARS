@@ -33,8 +33,7 @@ class MarsSettings(BaseSettings):
 
     KIMI_MODEL: str = "kimi-k2.5"
 
-    GLM_MODEL: str = "glm-4-plus"
-    GLM_AIR_MODEL: str = "glm-4-air"
+    GLM_MODEL: str = "glm-4.7-flash"  # 免费模型，作为兜底
 
     # ---- API endpoints ----
     DEEPSEEK_BASE_URL: str = "https://api.deepseek.com/v1"
