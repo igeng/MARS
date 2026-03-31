@@ -260,13 +260,12 @@ def _resolve_provider(provider: str) -> str:
         )
         return provider
 
-    # Try the default provider first (but keep glm as last resort)
+    # Try the default provider first, then fall back to first available
     default = settings.DEFAULT_LLM_PROVIDER.lower()
-    if default in available and default != "glm":
+    if default in available:
         fallback = default
     else:
-        non_glm = [p for p in available if p != "glm"]
-        fallback = non_glm[0] if non_glm else "glm"
+        fallback = available[0]
 
     logger.warning(
         "Provider '%s' has no API key configured – falling back to '%s'.",
@@ -318,15 +317,15 @@ def get_llm(
 
 # Maps each MARS agent role (lowercase key) to (provider, model_override).
 # ``None`` for model_override means "use the provider default".
-# Preferred providers are qwen and kimi – both work without extra keys.
-# deepseek/glm entries fall back automatically when those keys are absent.
+# Preferred providers are qwen and glm for most roles.
+# Other providers fall back automatically when those keys are absent.
 _AGENT_LLM_MAP: dict[str, tuple[str, str | None]] = {
     "researcher": ("qwen", None),     # Qwen – strong reasoning
-    "searcher": ("kimi", None),       # Kimi – long-context search synthesis
-    "analyzer": ("kimi", None),       # Kimi – long-context deep analysis
+    "searcher": ("glm", None),        # GLM – long-context search synthesis
+    "analyzer": ("glm", None),        # GLM – long-context deep analysis
     "connector": ("qwen", None),      # Qwen – relation reasoning
     "summarizer": ("qwen", None),     # Qwen – long text generation
-    "evaluator": ("kimi", None),      # Kimi – evaluation tasks
+    "evaluator": ("glm", None),       # GLM – evaluation tasks
 }
 
 
