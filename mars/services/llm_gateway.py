@@ -260,12 +260,13 @@ def _resolve_provider(provider: str) -> str:
         )
         return provider
 
-    # Try the default provider first
+    # Try the default provider first (but keep glm as last resort)
     default = settings.DEFAULT_LLM_PROVIDER.lower()
-    if default in available:
+    if default in available and default != "glm":
         fallback = default
     else:
-        fallback = available[0]
+        non_glm = [p for p in available if p != "glm"]
+        fallback = non_glm[0] if non_glm else "glm"
 
     logger.warning(
         "Provider '%s' has no API key configured – falling back to '%s'.",
