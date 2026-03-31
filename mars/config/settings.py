@@ -49,6 +49,12 @@ class MarsSettings(BaseSettings):
     LOG_LEVEL: str = "INFO"
     OUTPUT_DIR: Path = Path("./output")
 
+    # ---- GLM rate-limit handling ----
+    # Retry attempts on RateLimitError before switching to the next provider.
+    GLM_RATE_LIMIT_MAX_RETRIES: int = 3
+    # Base delay in seconds for exponential back-off (doubles each retry).
+    GLM_RATE_LIMIT_RETRY_DELAY: float = 5.0
+
     # ---- Crew memory ----
     # Set to True only when an OpenAI-compatible embedding API key is available.
     # CrewAI's built-in memory layer defaults to OpenAI embeddings; enabling this

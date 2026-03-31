@@ -31,7 +31,9 @@ Two types of LLM objects are returned:
 from __future__ import annotations
 
 import logging
-from typing import Any, NamedTuple
+import random
+import time
+from typing import Any, List, NamedTuple, Optional, Union
 
 from crewai import LLM
 from langchain_openai import ChatOpenAI
@@ -109,6 +111,108 @@ def _crewai_compatible_llm(
         is_litellm=True,
     )
 
+
+# ---------------------------------------------------------------------------
+# Rate-limit-aware LLM wrapper
+# ---------------------------------------------------------------------------
+
+class RateLimitAwareLLM(LLM):
+    """``crewai.LLM`` subclass with per-call rate-limit retry and fallback.
+
+    When the primary model returns a ``RateLimitError``:
+
+    1. Retries up to *max_retries* times using exponential back-off
+       (``retry_base_delay * 2^attempt``, capped at ``retry_max_delay``).
+    2. After exhausting retries, tries each ``crewai.LLM`` in *fallback_llms*
+       in order.  If a fallback also hits a rate limit it is skipped and the
+       next one is tried.
+    3. Raises the last ``RateLimitError`` only when every option has failed.
+
+    Args:
+        *args: Positional arguments forwarded to :class:`crewai.LLM`.
+        fallback_llms: Ordered list of fallback LLM instances to try after
+            the primary provider exhausts its retries.  Each entry should be
+            a plain :class:`crewai.LLM` (or another
+            ``RateLimitAwareLLM``).
+        max_retries: Maximum number of retry attempts on the *primary*
+            provider before switching to fallbacks.
+        retry_base_delay: Base delay in seconds for exponential back-off.
+        retry_max_delay: Upper bound on the computed back-off delay.
+        **kwargs: Keyword arguments forwarded to :class:`crewai.LLM`.
+    """
+
+    def __init__(
+        self,
+        *args: Any,
+        fallback_llms: Optional[List[LLM]] = None,
+        max_retries: int = 3,
+        retry_base_delay: float = 5.0,
+        retry_max_delay: float = 60.0,
+        **kwargs: Any,
+    ) -> None:
+        super().__init__(*args, **kwargs)
+        self._fallback_llms: List[LLM] = fallback_llms or []
+        self._max_retries = max_retries
+        self._retry_base_delay = retry_base_delay
+        self._retry_max_delay = retry_max_delay
+
+    def call(
+        self,
+        messages: Any,
+        tools: Any = None,
+        callbacks: Any = None,
+        available_functions: Any = None,
+    ) -> Any:
+        """Call the LLM, retrying on rate limits before falling back."""
+        from litellm.exceptions import RateLimitError as _RateLimitError  # lazy import
+
+        last_exc: BaseException | None = None
+
+        # --- Try primary provider with exponential back-off ---
+        for attempt in range(self._max_retries):
+            try:
+                return super().call(messages, tools, callbacks, available_functions)
+            except _RateLimitError as exc:
+                last_exc = exc
+                if attempt < self._max_retries - 1:
+                    delay = min(
+                        self._retry_base_delay * (2.0 ** attempt),
+                        self._retry_max_delay,
+                    )
+                    jitter = delay * 0.1 * random.random()
+                    wait = delay + jitter
+                    logger.warning(
+                        "Rate limit reached for %s; retrying in %.1fs "
+                        "(attempt %d/%d).",
+                        self.model,
+                        wait,
+                        attempt + 1,
+                        self._max_retries,
+                    )
+                    time.sleep(wait)
+
+        # --- Primary exhausted – try fallbacks in order ---
+        for fallback_llm in self._fallback_llms:
+            logger.warning(
+                "Switching from %s to %s after exhausting rate-limit retries.",
+                self.model,
+                fallback_llm.model,
+            )
+            try:
+                return fallback_llm.call(messages, tools, callbacks, available_functions)
+            except _RateLimitError as exc:
+                last_exc = exc
+                logger.warning(
+                    "Fallback %s also hit rate limit; trying next provider.",
+                    fallback_llm.model,
+                )
+                continue
+
+        # Safety net: last_exc is always set if we reach this point because
+        # every iteration of both loops catches _RateLimitError and assigns it.
+        # The assert keeps mypy happy without a type: ignore comment.
+        assert last_exc is not None, "Rate limit retry logic error: no exception recorded"
+        raise last_exc
 
 # ---------------------------------------------------------------------------
 # Provider helpers  (return ChatOpenAI – for direct tool invocation)
@@ -343,6 +447,10 @@ def get_llm_by_task(agent_role: str, temperature: float = 0.3) -> LLM:
     If the preferred provider for the role has no API key, the gateway
     transparently falls back to an available provider.
 
+    When the resolved provider is GLM, the returned object is a
+    :class:`RateLimitAwareLLM` that automatically retries with exponential
+    back-off and, after exhausting retries, switches to Qwen then Kimi.
+
     Args:
         agent_role: One of "researcher", "searcher", "analyzer",
                     "connector", "summarizer", "evaluator".
@@ -362,4 +470,55 @@ def get_llm_by_task(agent_role: str, temperature: float = 0.3) -> LLM:
     # When falling back, do not pass the caller's model override because
     # that model name may be invalid for the fallback provider.
     effective_model = model if resolved == provider else None
+
+    if resolved == "glm":
+        return _get_glm_with_fallbacks(model=effective_model, temperature=temperature)
+
     return _get_crewai_llm(provider=resolved, model=effective_model, temperature=temperature)
+
+
+def _get_glm_with_fallbacks(
+    model: str | None = None,
+    temperature: float = 0.3,
+) -> RateLimitAwareLLM:
+    """Build a :class:`RateLimitAwareLLM` for GLM with Qwen → Kimi fallback.
+
+    The fallback chain only includes providers whose API key is currently
+    configured in settings.  If neither Qwen nor Kimi has a key the returned
+    object still gives GLM ``settings.GLM_RATE_LIMIT_MAX_RETRIES`` attempts
+    with back-off before re-raising the rate-limit error.
+    """
+    glm_cfg = _CREWAI_PROVIDER_CFG["glm"]
+    glm_model = model or getattr(settings, glm_cfg.model_attr)
+    glm_api_key = getattr(settings, glm_cfg.key_attr)
+
+    # Build the ordered fallback list: Qwen first, then Kimi.
+    _FALLBACK_ORDER = ("qwen", "kimi")
+    fallback_llms: list[LLM] = []
+    for fp in _FALLBACK_ORDER:
+        fcfg = _CREWAI_PROVIDER_CFG[fp]
+        fkey = getattr(settings, fcfg.key_attr, "")
+        if not fkey:
+            continue
+        ft = fcfg.temperature_override if fcfg.temperature_override is not None else temperature
+        fallback_llms.append(
+            _crewai_compatible_llm(
+                model=f"{fcfg.model_prefix}/{getattr(settings, fcfg.model_attr)}",
+                api_key=fkey,
+                base_url=fcfg.base_url,
+                temperature=ft,
+            )
+        )
+
+    # Construct the RateLimitAwareLLM for the primary GLM model.
+    kwargs: dict[str, Any] = dict(
+        model=f"{glm_cfg.model_prefix}/{glm_model}",
+        base_url=glm_cfg.base_url,
+        temperature=temperature,
+        fallback_llms=fallback_llms,
+        max_retries=settings.GLM_RATE_LIMIT_MAX_RETRIES,
+        retry_base_delay=settings.GLM_RATE_LIMIT_RETRY_DELAY,
+    )
+    if glm_api_key:
+        return RateLimitAwareLLM(api_key=glm_api_key, **kwargs)
+    return RateLimitAwareLLM(is_litellm=True, **kwargs)
