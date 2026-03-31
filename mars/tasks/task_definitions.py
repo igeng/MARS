@@ -164,30 +164,68 @@ def create_connection_analysis_task(
     *,
     context: list[Task] | None = None,
 ) -> Task:
-    """Task: build citation network, topic clusters, research trends."""
+    """Task: build citation network, topic clusters, research trends; save JSON + Markdown."""
     papers_block = f"\n\n{papers_info}" if papers_info else ""
     return Task(
         description=(
-            f"对全部检索到的论文进行关联分析。{papers_block}\n\n"
+            f"对全部检索到的论文进行全面深入的关联分析。{papers_block}\n\n"
             f"研究主题：{topic}\n\n"
+            f"【输出说明】本任务将生成两份文件：\n"
+            f"1. connection_analysis.json — 机器可读的结构化关联数据\n"
+            f"2. connection_analysis_report.md — 供人阅读的深度叙述分析报告（2000+字）\n\n"
+            f"【第一步：构建结构化关联数据（保存为JSON）】\n"
             f"1. 如果论文有Semantic Scholar ID，使用citation_network_builder"
             f"   工具构建引用网络\n"
-            f"2. 分析论文之间的主题相似度（基于关键词和研究方法）\n"
-            f"3. 识别论文集合中的主题聚类（2-4个聚类）\n"
+            f"2. 分析论文之间的主题相似度（基于关键词、研究方法、实验基准）\n"
+            f"3. 识别论文集合中的主题聚类（3-5个聚类），每个聚类列出所有相关论文\n"
             f"4. 分析研究趋势：\n"
-            f"   - 新兴研究方向（近2年大量出现的主题）\n"
-            f"   - 成熟稳定的研究方向\n"
-            f"   - 潜在的研究空白\n"
-            f"5. 识别领域内的核心论文（高引用、奠基性工作）\n"
-            f"6. 使用file_writer工具保存网络分析结果到connection_analysis.json\n\n"
+            f"   - 新兴研究方向（近2年大量出现的主题，列举具体论文）\n"
+            f"   - 成熟稳定的研究方向（经典论文和奠基工作）\n"
+            f"   - 潜在的研究空白（缺失的连接和未被充分研究的问题）\n"
+            f"5. 识别领域内的核心论文（高引用、奠基性工作，至少列出10篇）\n"
+            f"6. 使用file_writer工具将结构化数据保存到 connection_analysis.json，"
+            f"   字段包括：citation_network_summary、topic_clusters、"
+            f"   research_trends、key_papers、similarity_groups、"
+            f"   methodology_lineage（方法传承链）、benchmark_groups（共用实验基准）\n\n"
+            f"【第二步：生成深度关联分析报告（保存为Markdown）】\n"
+            f"完成JSON保存后，基于以上分析结果撰写一份深度叙述报告，"
+            f"使用file_writer工具保存到 connection_analysis_report.md，"
+            f"报告结构如下（不少于2000字）：\n"
+            f"1. **论文集合全景概述**：论文总数、年份分布（列出各年数量）、"
+            f"   主要来源（会议/期刊及论文数），主要研究机构和高频作者群体\n"
+            f"2. **引用网络深度解析**：核心高引用节点论文的地位与贡献分析"
+            f"   （每篇2-3段），奠基性论文→发展性论文→最新工作的影响链条\n"
+            f"3. **主题聚类详细分析**：每个聚类的核心论文（列举具体标题），"
+            f"   聚类内论文之间的相互借鉴关系，聚类间的交叉点和联结\n"
+            f"4. **研究演进路径**：按时间线展示领域关键里程碑，"
+            f"   重要研究范式转变，每个阶段的代表性工作（列举论文标题和年份）\n"
+            f"5. **论文间深层关联分析**：方法论传承（哪些论文方法影响了哪些后续工作），"
+            f"   问题域关联（研究同一核心问题的论文群），"
+            f"   实验基准关联（使用相同数据集/评测基准的论文组）\n"
+            f"6. **研究热点与空白分析**：当前最活跃的研究主题（近2年高频关键词），"
+            f"   从网络结构中识别出的研究空白，最有潜力的跨领域融合机会\n"
+            f"7. **推荐阅读路径**：入门必读（3-5篇奠基论文），"
+            f"   技术进阶（5-8篇方法深度论文），前沿追踪（近2年重要工作）\n\n"
             f"重点关注：{topic}"
         ),
         expected_output=(
-            "论文关联分析报告，包含：\n"
-            "- citation_network_summary: 引用网络摘要（节点数、边数、核心论文）\n"
-            "- topic_clusters: 主题聚类列表，每个聚类包含主题名和相关论文\n"
-            "- research_trends: 研究趋势分析（新兴、成熟、空白方向）\n"
-            "- key_papers: 领域核心论文列表"
+            "两份输出文件：\n"
+            "1. connection_analysis.json：结构化关联数据，包含：\n"
+            "   - citation_network_summary: 引用网络摘要（节点数、边数）\n"
+            "   - topic_clusters: 3-5个主题聚类，每个聚类含全部相关论文列表\n"
+            "   - research_trends: 研究趋势（新兴/成熟/空白方向，各含具体论文）\n"
+            "   - key_papers: 至少10篇核心论文列表\n"
+            "   - similarity_groups: 高相似度论文组\n"
+            "   - methodology_lineage: 方法传承关系\n"
+            "   - benchmark_groups: 共用实验基准的论文组\n"
+            "2. connection_analysis_report.md：深度叙述报告（不少于2000字），包含：\n"
+            "   - 论文集合全景概述（数量/年份/来源统计）\n"
+            "   - 引用网络深度解析（核心论文分析）\n"
+            "   - 各聚类详细内部关系分析\n"
+            "   - 研究演进路径（时间线）\n"
+            "   - 论文间深层关联（方法传承/问题域/实验基准）\n"
+            "   - 研究热点与空白\n"
+            "   - 推荐阅读路径"
         ),
         agent=agent,
         context=context or [],
@@ -325,7 +363,9 @@ def create_quality_evaluation_task(
             f"研究问题、动机、贡献、方法解析、实验设置、对比方法、实验维度、"
             f"实验结果、结论、质量评分、优势、不足、改进建议）\n"
             f"5. 研究缺口识别与未来方向总结\n\n"
-            f"注意：直接输出完整Markdown内容作为任务结果，不要保存到任何文件。"
+            f"注意：\n"
+            f"1. 使用file_writer工具将完整报告保存到 analysis_report.md\n"
+            f"2. 同时将完整Markdown内容作为任务结果直接输出（供后续任务使用）"
         ),
         expected_output=(
             "一份完整的Markdown格式综合分析报告，包含：\n"
@@ -335,6 +375,100 @@ def create_quality_evaluation_task(
             "- 每篇论文的完整分析（元信息含下载链接、深度分析各要素、"
             "质量评分+优势+不足+改进建议）\n"
             "- 研究缺口识别与未来方向总结"
+        ),
+        agent=agent,
+        context=context or [],
+    )
+
+
+# ---------------------------------------------------------------------------
+# 7. Synthesizer tasks (full research workflow only)
+# ---------------------------------------------------------------------------
+
+def create_full_research_synthesis_task(
+    agent: Agent,
+    topic: str,
+    *,
+    context: list[Task] | None = None,
+) -> Task:
+    """Task: generate a comprehensive final synthesis report for the full research workflow.
+
+    This is distinct from review_zh.md (Chinese translation) — it provides an
+    executive-level synthesis combining statistics, quality rankings, connection
+    insights, and actionable future directions in a single authoritative document.
+    """
+    return Task(
+        description=(
+            f"基于所有前序任务的完整结果，生成一份全面深入的综合研究报告。\n\n"
+            f"研究主题：{topic}\n\n"
+            f"【注意】本报告与 review_zh.md（纯文献综述翻译）定位不同："
+            f"本报告是执行层面的综合分析，侧重统计数据、质量评级、关联洞见和"
+            f"可操作建议，而非学术综述正文。\n\n"
+            f"【报告结构要求（总字数不少于3000字）】\n\n"
+            f"# 一、报告封面与执行摘要\n"
+            f"- 报告标题、研究主题、生成日期\n"
+            f"- 执行摘要（300-500字）：本次研究的核心发现、领域现状一句话判断、"
+            f"  最关键的5个研究洞见（每条需引用具体论文）\n\n"
+            f"# 二、检索与分析全景统计\n"
+            f"- 检索论文总数，覆盖年份范围\n"
+            f"- 发表年份分布表格（每年论文数量）\n"
+            f"- 来源分布表格（按会议/期刊名称及论文数量排列，至少列出Top-10）\n"
+            f"- 高质量论文数量（CCF A类、B类、C类、其他分别列出）\n"
+            f"- 深度分析论文数量；关联分析覆盖论文数量\n\n"
+            f"# 三、领域研究全景\n"
+            f"- 基于领域分析结果：主研究域及3-5个子领域名称\n"
+            f"- 每个子领域的代表性论文（列举具体标题）及最新进展\n"
+            f"- 核心关键词云分析（列出频率最高的10-15个关键词及其出现论文数）\n"
+            f"- 主要研究机构和高产作者分析\n\n"
+            f"# 四、Top-10 精选论文深度点评\n"
+            f"按综合质量评分从高到低列出前10篇论文，每篇提供：\n"
+            f"- 标题、作者、年份、发表会议/期刊\n"
+            f"- 四维评分：novelty / technical_depth / experimental_validity / "
+            f"  writing_quality（各项分数，精确到0.1）\n"
+            f"- 综合评分（overall）\n"
+            f"- 核心贡献（2-3句话，具体）\n"
+            f"- 在领域中的地位和影响（1-2句话）\n\n"
+            f"# 五、论文关联网络核心洞见\n"
+            f"- 核心影响力论文（引用量最高的5篇）及其影响链条分析\n"
+            f"- 主要研究聚类（至少3个）的代表论文与聚类特征\n"
+            f"- 关键方法传承链：识别出至少3条 \"A论文方法 -> B论文发展 -> C论文改进\" 链条\n"
+            f"- 研究范式演变：按时间顺序列出3-5个重要范式转变节点（附论文和年份）\n\n"
+            f"# 六、质量评估综合分析\n"
+            f"- 四维度评分汇总表（所有深度分析论文，含平均分、最高分、最低分）\n"
+            f"- 领域整体学术质量水平判断（每个维度的平均水平及分析）\n"
+            f"- 高质量论文特征总结（优秀论文的共同特点）\n"
+            f"- 常见问题与不足（多篇论文共同存在的局限）\n\n"
+            f"# 七、研究空白与未来方向\n"
+            f"- 当前研究主要局限（从多篇论文综合分析，不少于3条，每条举例说明）\n"
+            f"- 关键未解问题清单（3-5个具体、可操作的科学问题）\n"
+            f"- 最有前景的研究方向（3-5个方向，每个方向给出具体研究建议和参考文献）\n"
+            f"- 跨领域融合机会（与哪些其他领域结合有潜力，为什么）\n\n"
+            f"# 八、本次研究输出文件导读指南\n"
+            f"列表说明本次研究生成的所有文件：\n"
+            f"| 文件名 | 内容说明 | 适合读者 | 建议用途 |\n"
+            f"|--------|----------|----------|----------|\n"
+            f"（依次说明：domain_analysis.json、paper_search.json、"
+            f"connection_analysis.json、connection_analysis_report.md、"
+            f"analysis_report.md、review_en.md、review_zh.md、"
+            f"full_research_report.md）\n\n"
+            f"推荐阅读顺序（从概览到深入）\n\n"
+            f"【写作要求】\n"
+            f"- 总字数不少于3000字\n"
+            f"- 语言：中文为主，专业术语首次出现附英文原文\n"
+            f"- 每个结论必须有具体论文标题或数据支撑，不能空泛\n"
+            f"- 所有表格数据要准确，不使用\u300c约\u300d等模糊表述\n"
+            f"- 使用file_writer工具将报告保存到 full_research_report.md"
+        ),
+        expected_output=(
+            "一份全面深入的综合研究报告（Markdown格式，不少于3000字），包含：\n"
+            "- 执行摘要（5个具体研究洞见）\n"
+            "- 检索统计（年份分布表、来源分布表、CCF等级统计）\n"
+            "- 领域全景（子领域、关键词、机构分析）\n"
+            "- Top-10精选论文深度点评（含四维评分）\n"
+            "- 关联网络核心洞见（影响链条、方法传承、范式演变）\n"
+            "- 质量评估汇总表（所有论文，含均值/最高/最低）\n"
+            "- 研究空白与未来方向（可操作的具体建议）\n"
+            "- 文件导读指南（表格形式）"
         ),
         agent=agent,
         context=context or [],
