@@ -496,25 +496,34 @@ class TestRateLimitAwareLLM:
             with pytest.raises(RateLimitError):
                 llm.call("hi")
 
-    def test_get_llm_by_task_glm_roles_return_rate_limit_aware_llm(self) -> None:
-        """GLM-mapped roles should return a RateLimitAwareLLM instance."""
+    def test_get_llm_by_task_searcher_analyzer_evaluator_return_crewai_llm(self) -> None:
+        """Roles searcher/analyzer (Qwen) and evaluator (Kimi) should return crewai.LLM instances."""
+        from crewai import LLM as CrewAILLM
         from mars.services.llm_gateway import get_llm_by_task, RateLimitAwareLLM
         from mars.config import settings
 
-        orig_key = settings.ZHIPU_API_KEY
+        orig = {
+            "DASHSCOPE_API_KEY": settings.DASHSCOPE_API_KEY,
+            "MOONSHOT_API_KEY": settings.MOONSHOT_API_KEY,
+        }
         try:
-            settings.ZHIPU_API_KEY = "test-zhipu-key"
+            settings.DASHSCOPE_API_KEY = "test-dashscope-key"
+            settings.MOONSHOT_API_KEY = "test-moonshot-key"
             for role in ("searcher", "analyzer", "evaluator"):
                 llm = get_llm_by_task(role)
-                assert isinstance(llm, RateLimitAwareLLM), (
-                    f"Expected RateLimitAwareLLM for role '{role}', got {type(llm)}"
+                assert isinstance(llm, CrewAILLM), (
+                    f"Expected crewai.LLM for role '{role}', got {type(llm)}"
+                )
+                assert not isinstance(llm, RateLimitAwareLLM), (
+                    f"Did not expect RateLimitAwareLLM for role '{role}'"
                 )
         finally:
-            settings.ZHIPU_API_KEY = orig_key
+            for k, v in orig.items():
+                setattr(settings, k, v)
 
     def test_get_llm_by_task_glm_has_qwen_fallback_when_key_available(self) -> None:
-        """GLM LLM should include Qwen in the fallback list when its key is set."""
-        from mars.services.llm_gateway import get_llm_by_task, RateLimitAwareLLM
+        """_get_glm_with_fallbacks should include Qwen in the fallback list when its key is set."""
+        from mars.services.llm_gateway import _get_glm_with_fallbacks, RateLimitAwareLLM
         from mars.config import settings
 
         orig = {
@@ -526,7 +535,7 @@ class TestRateLimitAwareLLM:
             settings.ZHIPU_API_KEY = "test-zhipu-key"
             settings.DASHSCOPE_API_KEY = "test-dashscope-key"
             settings.MOONSHOT_API_KEY = ""
-            llm = get_llm_by_task("analyzer")
+            llm = _get_glm_with_fallbacks()
             assert isinstance(llm, RateLimitAwareLLM)
             assert len(llm._fallback_llms) == 1
             assert "qwen" in llm._fallback_llms[0].model
