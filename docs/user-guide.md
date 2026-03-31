@@ -13,6 +13,7 @@
 3. [Windows 10 本地部署](#3-windows-10-本地部署)
    - [3.1–3.8 标准部署（venv）](#31-安装-python)
    - [3.9 使用 Conda + PyCharm 部署](#39-使用-conda--pycharm-部署替代方案)
+   - [3.10 使用 Git Bash 部署（推荐终端方案）](#310-使用-git-bash-部署推荐终端方案)
 4. [Ubuntu 云端部署](#4-ubuntu-云端部署)
 5. [配置说明](#5-配置说明)
 6. [命令行（CLI）使用指南](#6-命令行cli使用指南)
@@ -463,6 +464,498 @@ MARS 的依赖通过 pip 安装，不需要 `conda install`。直接使用：
 ```powershell
 conda activate mars
 pip install -r requirements.txt
+```
+
+---
+
+### 3.10 使用 Git Bash 部署（推荐终端方案）
+
+Git Bash 是 **Git for Windows** 附带的 Unix 风格终端模拟器，它在 Windows 上提供了与 Linux/macOS 几乎一致的 Bash 体验（`ls`、`cd`、`source`、`export` 等命令全部可用），非常适合习惯 Linux 命令行或需要跨平台统一工作流的开发者使用 MARS。
+
+> **适用场景**：你已安装 Git for Windows，希望用接近 Linux 的方式在 Win10 上运行 MARS CLI 命令，不想使用 Anaconda 或 PyCharm。
+
+#### 3.10.1 前置条件汇总
+
+在开始之前，请确认以下软件已安装：
+
+| 软件 | 版本要求 | 说明 |
+|------|----------|------|
+| Windows 10 | 1903+ | 任何 Win10 版本均可 |
+| Git for Windows | ≥ 2.30 | 包含 Git Bash，是本节核心工具 |
+| Python | ≥ 3.10（推荐 3.10、3.11 或 3.12） | 推荐从 Python 官网安装，**不要** 只从 Microsoft Store 安装 |
+| pip | 随 Python 自带 | 确保能在 Git Bash 中调用 `python -m pip` |
+
+---
+
+#### 3.10.2 安装 Git for Windows（获取 Git Bash）
+
+1. 打开浏览器，访问 **[https://git-scm.com/download/win](https://git-scm.com/download/win)**
+2. 点击 **"Click here to download"** 下载最新 64 位安装包（`Git-x.xx.x-64-bit.exe`）
+3. 运行安装程序，在各步骤中推荐选项如下：
+
+   | 安装步骤 | 推荐选项 |
+   |----------|----------|
+   | Select Components | 保持默认（包含 Git Bash Here） |
+   | Choosing the default editor | 选 Vim 或 Notepad++（随意） |
+   | **Adjusting your PATH environment** | 选 **"Git from the command line and also from 3rd-party software"**（推荐） |
+   | Choosing HTTPS transport backend | 保持默认（OpenSSL） |
+   | **Configuring the line ending conversions** | 选 **"Checkout as-is, commit Unix-style line endings"**（避免 CRLF 问题） |
+   | Configuring the terminal emulator | 选 **"Use MinTTY"**（默认，界面更好看） |
+   | 其余步骤 | 保持默认，点击 Next → Install |
+
+4. 安装完成后，在桌面或任意文件夹内右键，应能看到 **"Git Bash Here"** 菜单项。
+
+---
+
+#### 3.10.3 安装 Python（确保 Git Bash 可调用）
+
+> 如果已安装 Python 3.10+，可跳到验证步骤。
+
+1. 访问 **[https://www.python.org/downloads/windows/](https://www.python.org/downloads/windows/)**
+2. 下载 **Python 3.10、3.11 或 3.12 的 Windows installer (64-bit)**（MARS 要求 Python ≥ 3.10，三个版本均可使用）
+3. 运行安装程序时，**必须勾选以下选项**：
+   - ✅ **"Add Python 3.x to PATH"**（页面底部，非常重要！）
+   - ✅ **"Install pip"**（默认已勾选）
+4. 点击 **"Install Now"**
+
+**在 Git Bash 中验证 Python 安装**：
+
+打开 Git Bash（在开始菜单搜索 "Git Bash" 或右键文件夹选 "Git Bash Here"），输入：
+
+```bash
+python --version
+# 期望输出：Python 3.12.x（或 3.10.x / 3.11.x）
+
+python -m pip --version
+# 期望输出类似：pip 23.x from C:\Users\<用户名>\AppData\...\pip (python 3.12)
+```
+
+> **常见问题**：如果提示 `python: command not found`，说明 Python 未添加到 PATH。
+> 解决方法：在系统环境变量中手动添加 Python 安装路径（通常为 `C:\Users\<用户名>\AppData\Local\Programs\Python\Python312\` 和 `C:\Users\<用户名>\AppData\Local\Programs\Python\Python312\Scripts\`），然后**关闭并重新打开 Git Bash**。
+
+---
+
+#### 3.10.4 克隆 MARS 仓库
+
+在 Git Bash 中执行：
+
+```bash
+# 进入你想存放项目的目录（示例：D 盘的 Projects 文件夹）
+cd /d/Projects
+# 如果该目录不存在，先创建：
+mkdir -p /d/Projects && cd /d/Projects
+
+# 克隆仓库
+git clone https://github.com/igeng/MARS.git
+
+# 进入项目目录
+cd MARS
+
+# 查看项目结构（确认克隆成功）
+ls -la
+# 应能看到 main.py、requirements.txt、mars/、docs/ 等文件和目录
+```
+
+> **路径说明**：Git Bash 中 Windows 路径的写法：
+> - `C:\Users\用户名` → `/c/Users/用户名`
+> - `D:\Projects` → `/d/Projects`
+
+---
+
+#### 3.10.5 创建 Python 虚拟环境
+
+在 Git Bash 中，于 MARS 项目根目录执行：
+
+```bash
+# 确认当前在 MARS 目录中
+pwd
+# 期望输出类似：/d/Projects/MARS
+
+# 创建虚拟环境（名为 .venv，位于项目根目录下）
+python -m venv .venv
+
+# 激活虚拟环境（Git Bash 语法，不同于 PowerShell）
+source .venv/Scripts/activate
+
+# 确认激活成功：命令提示符前应出现 (.venv)
+# (.venv) username@DESKTOP:/d/Projects/MARS $
+```
+
+> **注意**：Git Bash 中激活虚拟环境使用 `source .venv/Scripts/activate`，与 Linux/macOS 下的 `source .venv/bin/activate` 路径略有不同（Windows 虚拟环境的脚本在 `Scripts/` 而非 `bin/` 下）。
+
+**验证虚拟环境已激活**：
+
+```bash
+# 查看当前使用的 Python 解释器路径（应指向 .venv 内部）
+which python
+# 期望输出类似：/d/Projects/MARS/.venv/Scripts/python
+
+python --version
+# 期望输出：Python 3.12.x
+```
+
+---
+
+#### 3.10.6 升级 pip 并安装项目依赖
+
+激活虚拟环境后，执行：
+
+```bash
+# 第一步：升级 pip 到最新版（避免旧版 pip 安装某些包时报错）
+python -m pip install --upgrade pip
+
+# 第二步：安装所有依赖包
+pip install -r requirements.txt
+# 这将安装 crewai、litellm、fastapi、pydantic-settings、pymupdf 等全部依赖
+# 预计耗时 3-10 分钟，取决于网络速度
+
+# 第三步（推荐）：以开发模式安装 MARS 本身
+# 这一步会注册 mars 命令行工具（即 mars search、mars full 等命令）
+pip install -e .
+```
+
+**验证依赖安装是否成功**：
+
+```bash
+# 检查 mars 命令是否可用
+mars --help
+# 期望输出：显示 MARS 命令帮助信息，包含 search、analyze、connect、full、api、check 等子命令
+
+# 验证核心包已安装
+python -c "import crewai; print('crewai OK')"
+python -c "import litellm; print('litellm OK')"
+python -c "import fastapi; print('fastapi OK')"
+```
+
+> **若 `pymupdf` 安装失败**（Windows 上偶有此情况）：
+>
+> ```bash
+> # 方法一：禁用隔离编译
+> pip install pymupdf --no-build-isolation
+>
+> # 方法二：跳过安装（系统会自动使用 PyPDF2 作为备选）
+> # 从 requirements.txt 临时移除 pymupdf 行后再安装其余依赖
+> grep -v "pymupdf" requirements.txt > /tmp/req_no_mupdf.txt
+> pip install -r /tmp/req_no_mupdf.txt
+> ```
+
+---
+
+#### 3.10.7 配置 API Key
+
+```bash
+# 复制环境变量模板文件
+cp .env.example .env
+
+# 用 Windows 记事本打开编辑（Git Bash 中可以这样调用 Windows 应用）
+notepad .env
+
+# 或者用 nano（如果安装了）
+# nano .env
+
+# 或者直接用 VS Code 打开（如果已安装）
+# code .env
+```
+
+在打开的 `.env` 文件中，填入你的 API Key。以下是完整的配置项说明：
+
+```env
+# ============================================================
+# LLM 供应商 API Key（至少填写一个，推荐全部填写）
+# ============================================================
+
+# 阿里云 Qwen（通义千问）
+# 获取地址：https://bailian.console.aliyun.com/ → API-KEY 管理
+DASHSCOPE_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+
+# DeepSeek
+# 获取地址：https://platform.deepseek.com/ → API Keys
+DEEPSEEK_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+
+# 月之暗面 Kimi（Moonshot AI）
+# 获取地址：https://platform.moonshot.cn/ → API Key 管理
+MOONSHOT_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+
+# 智谱 AI（GLM）
+# 获取地址：https://open.bigmodel.cn/ → API Key（格式为 xxx.yyy）
+ZHIPU_API_KEY=xxxxxxxxxxxxxxxx.xxxxxxxxxxxxxxxx
+
+# ============================================================
+# 可选：学术搜索 API
+# ============================================================
+
+# Semantic Scholar（不配置也能使用，但有速率限制）
+# 获取地址：https://www.semanticscholar.org/product/api
+SEMANTIC_SCHOLAR_API_KEY=
+
+# ============================================================
+# 应用配置
+# ============================================================
+
+# 默认 LLM 供应商（改为你已配置 API Key 的供应商）
+# 可选值：qwen | deepseek | kimi | glm
+DEFAULT_LLM_PROVIDER=qwen
+
+# 检索和分析的最大论文数量
+MAX_PAPERS_PER_SEARCH=50
+MAX_PAPERS_FOR_ANALYSIS=20
+
+# 是否启用 CrewAI 记忆功能（需要 OpenAI Embedding API，默认关闭）
+ENABLE_MEMORY=false
+```
+
+保存并关闭文件。
+
+---
+
+#### 3.10.8 验证整体安装
+
+运行 MARS 内置的配置检查命令：
+
+```bash
+mars check
+```
+
+正常情况下，输出类似：
+
+```
+╭─────────────────────────────────────────────────────╮
+│ 🚀 MARS - Multi-Agent Research System               │
+│    多智能体学术文献智能检索与分析系统                │
+╰─────────────────────────────────────────────────────╯
+
+🔎 检查系统配置...
+
+          LLM 供应商状态
+┌──────────┬──────────────────────┬──────────────────────────────┐
+│ 供应商   │ 环境变量             │ 状态                         │
+├──────────┼──────────────────────┼──────────────────────────────┤
+│ qwen     │ DASHSCOPE_API_KEY    │ ✅ 已配置 (sk-x****xxxx)     │
+│ deepseek │ DEEPSEEK_API_KEY     │ ✅ 已配置 (sk-x****xxxx)     │
+│ kimi     │ MOONSHOT_API_KEY     │ ✅ 已配置 (sk-x****xxxx)     │
+│ glm      │ ZHIPU_API_KEY        │ ✅ 已配置 (xxxx****xxxx)     │
+└──────────┴──────────────────────┴──────────────────────────────┘
+
+默认供应商: qwen
+可用供应商: qwen, deepseek, kimi, glm
+
+Semantic Scholar API Key: ⚠ 未配置（可使用，但速率受限）
+
+输出目录: D:\Projects\MARS\output
+数据库:   sqlite:///./mars.db
+
+✅ 系统就绪 — 可使用 4 个 LLM 供应商
+```
+
+如果看到 `✅ 系统就绪`，即可开始使用 MARS。
+
+---
+
+#### 3.10.9 在 Git Bash 中运行 CLI 命令
+
+**启动前确认虚拟环境已激活**（提示符前有 `(.venv)` 字样）：
+
+```bash
+# 如果关闭了 Git Bash 或打开了新窗口，需要重新激活虚拟环境
+cd /d/Projects/MARS
+source .venv/Scripts/activate
+```
+
+**基础检索（search）**
+
+```bash
+# 检索某一研究主题，自动生成论文列表 + 双语综述
+mars search "federated learning with differential privacy"
+
+# 中文主题同样支持
+mars search "联邦学习隐私保护"
+
+# 指定最大检索数量（默认 50）
+mars search "graph neural network" --max-results 30
+```
+
+输出文件保存在 `output/search_<时间戳>/` 目录下，包含：
+- `prompt.txt` — 原始输入
+- `run.log` — 完整运行日志
+- `paper_search.json` — 论文列表（含标题、作者、年份、引用数等）
+- `review_en.md` — 英文学术综述（≥ 3000 字）
+- `review_zh.md` — 中文综述（英文版的高质量翻译）
+
+**深度分析（analyze）**
+
+```bash
+# 输入论文标题列表（用 | 分隔），进行深度解析和质量评估
+mars analyze "Federated Learning: Challenges, Methods, and Future Directions | Communication-Efficient Learning of Deep Networks from Decentralized Data"
+
+# 指定最大分析论文数（默认 20）
+mars analyze "paper1 | paper2 | paper3" --max-papers 10
+```
+
+**关联分析（connect）**
+
+```bash
+# 分析多篇论文之间的引用关系和主题关联
+mars connect "Attention Is All You Need | BERT: Pre-training of Deep Bidirectional Transformers | GPT-3: Language Models are Few-Shot Learners" --topic "transformer models in NLP"
+```
+
+**完整研究流程（full）**
+
+```bash
+# 一键执行：领域分析 → 检索 → 深度解析 → 关联分析 → 质量评估 → 双语综述
+# 这是最完整的研究工作流，预计耗时 12-21 分钟
+mars full "知识图谱嵌入方法综述"
+
+# 英文主题
+mars full "survey of large language model alignment techniques"
+```
+
+**启动 Web API 服务器**
+
+```bash
+# 在本地 8000 端口启动 FastAPI 服务器
+mars api --port 8000
+
+# 启动后在浏览器中打开 Swagger UI：
+# http://localhost:8000/docs
+```
+
+**在后台运行（nohup）**
+
+```bash
+# 将完整研究任务放后台运行，日志写入 bg.log
+nohup mars full "topic here" > bg.log 2>&1 &
+echo "Background PID: $!"
+
+# 实时查看后台任务进度
+tail -f bg.log
+```
+
+---
+
+#### 3.10.10 Git Bash 专项注意事项
+
+**① 中文输出乱码问题**
+
+Git Bash（MinTTY）对 UTF-8 支持良好，通常不会出现乱码。但如果遇到问题，可以在 Git Bash 中设置：
+
+```bash
+# 设置终端编码为 UTF-8
+export LANG=zh_CN.UTF-8
+export PYTHONIOENCODING=utf-8
+
+# 或者将这两行加入 ~/.bashrc，每次启动自动生效
+echo 'export LANG=zh_CN.UTF-8' >> ~/.bashrc
+echo 'export PYTHONIOENCODING=utf-8' >> ~/.bashrc
+source ~/.bashrc
+```
+
+**② `mars` 命令找不到（`command not found`）**
+
+原因：虚拟环境未激活，或未以开发模式安装项目。
+
+```bash
+# 解决方法：先激活虚拟环境，再安装
+source .venv/Scripts/activate
+pip install -e .
+
+# 验证
+which mars
+# 应输出：/d/Projects/MARS/.venv/Scripts/mars
+```
+
+**③ Python 路径中有空格**
+
+如果项目路径包含空格（如 `D:\My Projects\MARS`），在 Git Bash 中需要加引号：
+
+```bash
+cd "/d/My Projects/MARS"
+source .venv/Scripts/activate
+```
+
+建议将项目放在无空格的路径下（如 `/d/Projects/MARS`），避免潜在的兼容性问题。
+
+**④ 虚拟环境激活后 `pip` 仍指向全局 Python**
+
+```bash
+# 检查 pip 指向
+which pip
+# 应输出 .venv 路径，如：/d/Projects/MARS/.venv/Scripts/pip
+
+# 如果指向错误，强制使用：
+python -m pip install -r requirements.txt
+python -m pip install -e .
+```
+
+**⑤ 每次打开 Git Bash 都需要重新激活虚拟环境**
+
+可以在 `~/.bashrc` 中添加快捷函数：
+
+```bash
+# 在 Git Bash 中编辑 ~/.bashrc
+echo 'alias mars-activate="cd /d/Projects/MARS && source .venv/Scripts/activate"' >> ~/.bashrc
+source ~/.bashrc
+
+# 以后每次打开 Git Bash 只需运行：
+mars-activate
+```
+
+**⑥ `pip install` 速度慢**
+
+在中国大陆地区，可以使用国内镜像源加速：
+
+```bash
+# 使用阿里云镜像一次性安装
+pip install -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple/
+
+# 或者永久配置镜像（写入 pip 配置文件）
+pip config set global.index-url https://mirrors.aliyun.com/pypi/simple/
+```
+
+**⑦ 长路径错误（`WinError 206`）**
+
+如果出现文件路径过长的错误，需要启用 Windows 长路径支持：
+
+以管理员身份运行 PowerShell（在开始菜单搜索 PowerShell，右键"以管理员身份运行"），执行：
+
+```powershell
+New-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem" `
+  -Name "LongPathsEnabled" -Value 1 -PropertyType DWORD -Force
+```
+
+修改后无需重启，再次打开 Git Bash 即可生效。
+
+---
+
+#### 3.10.11 完整部署流程快速参考
+
+以下是从零开始到成功运行的最简命令序列（假设 Git 和 Python 已安装）：
+
+```bash
+# 1. 打开 Git Bash，进入工作目录
+cd /d/Projects
+
+# 2. 克隆项目
+git clone https://github.com/igeng/MARS.git
+cd MARS
+
+# 3. 创建并激活虚拟环境
+python -m venv .venv
+source .venv/Scripts/activate
+
+# 4. 安装依赖
+python -m pip install --upgrade pip
+pip install -r requirements.txt
+pip install -e .
+
+# 5. 配置 API Key
+cp .env.example .env
+notepad .env          # 填入至少一个 LLM API Key，保存退出
+
+# 6. 验证配置
+mars check
+
+# 7. 开始使用！
+mars search "your research topic"
 ```
 
 ---
