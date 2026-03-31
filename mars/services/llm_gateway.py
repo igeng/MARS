@@ -72,6 +72,7 @@ def _crewai_compatible_llm(
     api_key: str,
     base_url: str,
     temperature: float = 0.3,
+    **kwargs: Any,
 ) -> LLM:
     """Return a crewai.LLM instance pointed at an OpenAI-compatible endpoint.
 
@@ -93,6 +94,10 @@ def _crewai_compatible_llm(
     bypasses native-SDK API-key validation by requesting the LiteLLM path so
     that the LLM object can always be constructed.  It will still raise an auth
     error if an actual API call is made without a valid key.
+
+    Additional *kwargs* are forwarded verbatim to :class:`crewai.LLM` (and
+    from there to LiteLLM), enabling caller-controlled parameters such as
+    ``extra_body``.
     """
     # Native provider SDKs validate the API key at construction time.
     # When no key is available yet (api_key is None or ""), fall back to the
@@ -103,12 +108,14 @@ def _crewai_compatible_llm(
             api_key=api_key,
             base_url=base_url,
             temperature=temperature,
+            **kwargs,
         )
     return LLM(
         model=model,
         base_url=base_url,
         temperature=temperature,
         is_litellm=True,
+        **kwargs,
     )
 
 
@@ -315,11 +322,20 @@ def _get_crewai_llm(provider: str, model: str | None = None, temperature: float 
     effective_temperature = (
         cfg.temperature_override if cfg.temperature_override is not None else temperature
     )
+    extra_kwargs: dict[str, Any] = {}
+    # Qwen3 series models (e.g. qwen3.5-flash) have thinking/reasoning mode
+    # enabled by default.  When thinking is active the API returns an empty
+    # ``content`` field (reasoning lives in ``reasoning_content``), causing
+    # LiteLLM / CrewAI to report "Invalid response from LLM call - None or
+    # empty."  Disabling thinking ensures a non-empty text response.
+    if provider == "qwen" and model_name.lower().startswith("qwen3"):
+        extra_kwargs["extra_body"] = {"enable_thinking": False}
     return _crewai_compatible_llm(
         model=f"{cfg.model_prefix}/{model_name}",
         api_key=getattr(settings, cfg.key_attr),
         base_url=cfg.base_url,
         temperature=effective_temperature,
+        **extra_kwargs,
     )
 
 
@@ -494,12 +510,17 @@ def _get_glm_with_fallbacks(
         if not fkey:
             continue
         ft = fcfg.temperature_override if fcfg.temperature_override is not None else temperature
+        fallback_model = getattr(settings, fcfg.model_attr)
+        fb_extra: dict[str, Any] = {}
+        if fp == "qwen" and fallback_model.lower().startswith("qwen3"):
+            fb_extra["extra_body"] = {"enable_thinking": False}
         fallback_llms.append(
             _crewai_compatible_llm(
-                model=f"{fcfg.model_prefix}/{getattr(settings, fcfg.model_attr)}",
+                model=f"{fcfg.model_prefix}/{fallback_model}",
                 api_key=fkey,
                 base_url=fcfg.base_url,
                 temperature=ft,
+                **fb_extra,
             )
         )
 
