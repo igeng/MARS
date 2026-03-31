@@ -5,12 +5,13 @@ Flow:
   User topic
     → Researcher Agent (domain analysis)
     → Searcher Agent (bulk retrieval, 50 papers, saves paper_search.json)
-    → [Parallel]
-        ├─ Analyzer Agent (deep analysis, top 20 papers)
-        ├─ Connector Agent (relationship analysis, all 50 papers)
-        └─ Evaluator Agent (quality evaluation, top 20 papers)
-    → Summarizer Agent (English review → Chinese translation)
-    → Return complete research report
+    → Analyzer Agent (deep analysis, top 20 papers)
+    → Connector Agent (relationship analysis + saves connection_analysis.json
+                        + connection_analysis_report.md)
+    → Evaluator Agent (quality evaluation, saves analysis_report.md)
+    → Summarizer Agent (English review → saves review_en.md)
+    → Summarizer Agent (Chinese translation → saves review_zh.md)
+    → Summarizer Agent (final synthesis → saves full_research_report.md)
 """
 
 from __future__ import annotations
@@ -29,6 +30,7 @@ from mars.tasks.task_definitions import (
     create_deep_analysis_task,
     create_domain_analysis_task,
     create_english_review_task,
+    create_full_research_synthesis_task,
     create_paper_search_task,
     create_quality_evaluation_task,
     create_review_generation_task,
@@ -100,6 +102,23 @@ def create_full_research_crew(topic: str) -> Crew:
         ],
     )
 
+    # ---- Sequential phase 4: Comprehensive final synthesis report ----
+    # Combines statistics, quality rankings, connection insights, and reading guide
+    # into a single authoritative document distinct from review_zh.md
+    synthesis_task = create_full_research_synthesis_task(
+        summarizer,
+        topic,
+        context=[
+            domain_analysis_task,
+            bulk_search_task,
+            deep_analysis_task,
+            connection_analysis_task,
+            quality_evaluation_task,
+            english_review_task,
+            chinese_review_task,
+        ],
+    )
+
     return Crew(
         agents=[researcher, searcher, analyzer, connector, evaluator, summarizer],
         tasks=[
@@ -110,6 +129,7 @@ def create_full_research_crew(topic: str) -> Crew:
             quality_evaluation_task,
             english_review_task,
             chinese_review_task,
+            synthesis_task,
         ],
         process=Process.sequential,
         verbose=True,

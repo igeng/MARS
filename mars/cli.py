@@ -308,17 +308,46 @@ def full_research_command(
         con.print(f"\n[bold green]🚀 启动完整研究流程：[/bold green] {topic}\n")
         con.print(
             "[dim]此流程将依次执行：领域分析 → 论文检索 → 深度解析 → "
-            "关联分析 → 质量评估 → 中/英综述生成[/dim]\n"
+            "关联分析 → 质量评估 → 中/英综述生成 → 综合报告生成[/dim]\n"
         )
         con.print(f"[dim]📁 本次运行输出目录：{run_dir.resolve()}[/dim]\n")
+
+        # Print expected output file list
+        file_table = Table(
+            title="📋 本次运行预计生成以下 10 份文件",
+            show_header=True,
+            header_style="bold cyan",
+        )
+        file_table.add_column("文件名", style="cyan", no_wrap=True)
+        file_table.add_column("内容说明", style="white")
+        file_table.add_column("格式", style="dim")
+        _expected_files = [
+            ("prompt.txt",                   "输入的研究主题",                                  "文本"),
+            ("run.log",                      "完整运行日志",                                    "文本"),
+            ("domain_analysis.json",         "领域分析：子领域 / 关键词 / 推荐期刊会议",        "JSON"),
+            ("paper_search.json",            "检索结果：50篇论文完整元数据",                    "JSON"),
+            ("connection_analysis.json",     "关联网络结构化数据：引用图 / 聚类 / 趋势",        "JSON"),
+            ("connection_analysis_report.md","论文关联关系深度分析报告（2000+字）",             "Markdown"),
+            ("analysis_report.md",           "逐篇论文质量评估报告（多维评分 + 改进建议）",     "Markdown"),
+            ("review_en.md",                 "英文学术文献综述（3000+字）",                     "Markdown"),
+            ("review_zh.md",                 "中文学术文献综述（英文版完整翻译）",              "Markdown"),
+            ("full_research_report.md",      "综合研究报告：统计 + 质量排名 + 洞见 + 导读指南", "Markdown"),
+        ]
+        for fname, desc, fmt in _expected_files:
+            file_table.add_row(fname, desc, fmt)
+        con.print(file_table)
+        con.print()
 
         from mars.crews.full_research_crew import run_full_research
 
         try:
-            result = run_full_research(topic)
-            con.print("\n[bold cyan]📚 完整研究报告：[/bold cyan]")
-            con.print(result)
-            _save_result(result, "full_research_report", con)
+            # run_full_research returns the synthesis task's string output, but
+            # all 10 output files are already saved by agents via file_writer.
+            run_full_research(topic)
+            con.print(
+                f"\n[bold cyan]✅ 完整研究流程已完成[/bold cyan]\n"
+                f"[dim]所有 10 份输出文件已保存至：{run_dir.resolve()}[/dim]"
+            )
         except Exception as exc:
             con.print(f"[bold red]❌ 研究流程失败：{exc}[/bold red]")
             raise typer.Exit(1) from exc
