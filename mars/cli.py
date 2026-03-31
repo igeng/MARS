@@ -229,7 +229,10 @@ def analyze_command(
         (run_dir / "prompt.txt").write_text(papers, encoding="utf-8")
         _print_banner(con)
         con.print(f"\n[bold green]🔬 开始深度分析...[/bold green]\n")
-        con.print(f"[dim]📁 本次运行输出目录：{run_dir.resolve()}[/dim]\n")
+        con.print(
+            f"[dim]📁 本次运行输出目录：{run_dir.resolve()}[/dim]\n"
+            f"[dim]预计生成3份文件：prompt.txt、run.log、analysis_report.md[/dim]\n"
+        )
 
         from mars.crews.analysis_crew import run_analysis
 
@@ -237,7 +240,12 @@ def analyze_command(
             result = run_analysis(papers, max_papers=max_papers)
             con.print("\n[bold cyan]📊 分析报告：[/bold cyan]")
             con.print(result)
-            _save_result(result, "analysis_report", con)
+            report_path = run_dir / "analysis_report.md"
+            try:
+                report_path.write_text(result, encoding="utf-8")
+                con.print(f"\n[dim]💾 结果已保存至：{report_path.resolve()}[/dim]")
+            except OSError as exc:
+                con.print(f"[yellow]⚠ 结果保存失败：{exc}[/yellow]")
         except Exception as exc:
             con.print(f"[bold red]❌ 分析失败：{exc}[/bold red]")
             raise typer.Exit(1) from exc

@@ -421,15 +421,15 @@ def get_llm(
 
 # Maps each MARS agent role (lowercase key) to (provider, model_override).
 # ``None`` for model_override means "use the provider default".
-# Preferred providers are qwen and glm for most roles.
-# Other providers fall back automatically when those keys are absent.
+# Preferred providers are qwen and kimi; other providers fall back automatically
+# when those keys are absent.
 _AGENT_LLM_MAP: dict[str, tuple[str, str | None]] = {
     "researcher": ("qwen", None),     # Qwen – strong reasoning
-    "searcher": ("glm", None),        # GLM – long-context search synthesis
-    "analyzer": ("glm", None),        # GLM – long-context deep analysis
+    "searcher": ("qwen", None),       # Qwen – long-context search synthesis
+    "analyzer": ("qwen", None),       # Qwen – long-context deep analysis
     "connector": ("qwen", None),      # Qwen – relation reasoning
     "summarizer": ("qwen", None),     # Qwen – long text generation
-    "evaluator": ("glm", None),       # GLM – evaluation tasks
+    "evaluator": ("kimi", None),      # Kimi – evaluation tasks
 }
 
 
@@ -446,10 +446,6 @@ def get_llm_by_task(agent_role: str, temperature: float = 0.3) -> LLM:
 
     If the preferred provider for the role has no API key, the gateway
     transparently falls back to an available provider.
-
-    When the resolved provider is GLM, the returned object is a
-    :class:`RateLimitAwareLLM` that automatically retries with exponential
-    back-off and, after exhausting retries, switches to Qwen then Kimi.
 
     Args:
         agent_role: One of "researcher", "searcher", "analyzer",
@@ -470,9 +466,6 @@ def get_llm_by_task(agent_role: str, temperature: float = 0.3) -> LLM:
     # When falling back, do not pass the caller's model override because
     # that model name may be invalid for the fallback provider.
     effective_model = model if resolved == provider else None
-
-    if resolved == "glm":
-        return _get_glm_with_fallbacks(model=effective_model, temperature=temperature)
 
     return _get_crewai_llm(provider=resolved, model=effective_model, temperature=temperature)
 
