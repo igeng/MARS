@@ -151,8 +151,10 @@ MARS/
 ├── README.md                      # 项目简介
 │
 ├── docs/                          # 文档目录
-│   ├── technical-guide.md         # 技术开发文档（本文件）
-│   └── user-guide.md              # 使用手册
+│   ├── technical-guide.md         # 技术开发文档（中文，本文件）
+│   ├── technical-guide_en.md      # Technical Development Guide (English)
+│   ├── user-guide.md              # 使用手册（中文）
+│   └── user-guide_en.md           # User Manual (English)
 │
 ├── mars/                          # 主程序包
 │   ├── __init__.py                # 包初始化（版本号）
@@ -482,7 +484,7 @@ Phase 3:  Summarizer (english_review_task → chinese_review_task)
 | 阿里云（Qwen） | `get_qwen_llm()` | `https://dashscope.aliyuncs.com/compatible-mode/v1` | qwen3.5-flash |
 | DeepSeek | `get_deepseek_llm()` | `https://api.deepseek.com/v1` | deepseek-chat |
 | 月之暗面（Kimi） | `get_kimi_llm()` | `https://api.moonshot.cn/v1` | kimi-k2.5 |
-| 智谱 AI（GLM） | `get_glm_llm()` | `https://open.bigmodel.cn/api/paas/v4` | glm-4-plus |
+| 智谱 AI（GLM） | `get_glm_llm()` | `https://open.bigmodel.cn/api/paas/v4` | glm-4.7-flash |
 
 - `get_qwen_llm()` / `get_deepseek_llm()` / `get_kimi_llm()` / `get_glm_llm()` 返回 `ChatOpenAI` 实例，供工具内部直接调用（如 `KeywordExpanderTool`）。
 - `get_llm_by_task()` 返回 `crewai.LLM` 实例，供 CrewAI `Agent` 使用；模型字符串携带 LiteLLM provider 前缀：所有 OpenAI 兼容供应商（DashScope/Moonshot/Zhipu）统一使用 `openai/<model>` 前缀加 `base_url`（LiteLLM 通用兼容路径），DeepSeek 使用 `deepseek/<model>` 前缀（例如 `openai/qwen3.5-flash`、`openai/kimi-k2.5`、`deepseek/deepseek-chat`）。`openai/` 此处为 LiteLLM 路由前缀，与 OpenAI 官方 API 无关。
@@ -600,8 +602,7 @@ class MarsSettings(BaseSettings):
     DEEPSEEK_MODEL: str = "deepseek-chat"
     DEEPSEEK_CODER_MODEL: str = "deepseek-coder"
     KIMI_MODEL: str = "kimi-k2.5"
-    GLM_MODEL: str = "glm-4-plus"
-    GLM_AIR_MODEL: str = "glm-4-air"
+    GLM_MODEL: str = "glm-4.7-flash"  # 免费模型，作为兜底
 
     # API 端点
     DEEPSEEK_BASE_URL: str = "https://api.deepseek.com/v1"
@@ -611,11 +612,17 @@ class MarsSettings(BaseSettings):
     SEMANTIC_SCHOLAR_API_KEY: str = ""
     MAX_PAPERS_PER_SEARCH: int = Field(default=50, gt=0)
     MAX_PAPERS_FOR_ANALYSIS: int = Field(default=20, gt=0)
+    # arXiv 请求读取超时（秒），网络较慢时可适当增大
+    ARXIV_SEARCH_TIMEOUT: int = Field(default=30, gt=0)
 
     # 应用设置
     DEFAULT_LLM_PROVIDER: str = "qwen"
     LOG_LEVEL: str = "INFO"
     OUTPUT_DIR: Path = Path("./output")
+
+    # GLM 限流处理
+    GLM_RATE_LIMIT_MAX_RETRIES: int = 3       # RateLimitError 重试次数
+    GLM_RATE_LIMIT_RETRY_DELAY: float = 5.0   # 指数退避基础延迟（秒）
 
     # Crew 记忆（需要有效的 OpenAI 兼容嵌入 Key 才能启用）
     ENABLE_MEMORY: bool = False

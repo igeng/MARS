@@ -1202,11 +1202,14 @@ sudo ufw status
 | `QWEN_MODEL` | 否 | qwen3.5-flash | Qwen 模型名称 |
 | `DEEPSEEK_MODEL` | 否 | deepseek-chat | DeepSeek 模型名称 |
 | `KIMI_MODEL` | 否 | kimi-k2.5 | Kimi 模型名称 |
-| `GLM_MODEL` | 否 | glm-4-plus | GLM 模型名称 |
+| `GLM_MODEL` | 否 | glm-4.7-flash | GLM 模型名称（免费模型，作为兜底） |
 | `MAX_PAPERS_PER_SEARCH` | 否 | 50 | 每次检索最大论文数 |
 | `MAX_PAPERS_FOR_ANALYSIS` | 否 | 20 | 深度分析最大论文数 |
+| `ARXIV_SEARCH_TIMEOUT` | 否 | 30 | arXiv API 请求超时秒数 |
 | `OUTPUT_DIR` | 否 | ./output | 输出文件根目录 |
 | `ENABLE_MEMORY` | 否 | false | 是否启用 CrewAI 记忆（需要 OpenAI 兼容嵌入 Key） |
+| `GLM_RATE_LIMIT_MAX_RETRIES` | 否 | 3 | GLM 限流重试次数 |
+| `GLM_RATE_LIMIT_RETRY_DELAY` | 否 | 5.0 | GLM 限流退避基础延迟（秒） |
 | `DATABASE_URL` | 否 | sqlite:///./mars.db | 数据库连接 URL |
 | `LOG_LEVEL` | 否 | INFO | 日志级别 |
 | `API_HOST` | 否 | 0.0.0.0 | API 服务器地址 |
