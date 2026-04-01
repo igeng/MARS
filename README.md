@@ -350,8 +350,10 @@ All providers are accessed via OpenAI-compatible APIs, making it easy to switch 
 
 | Document | Description |
 |----------|-------------|
-| [Technical Development Guide](docs/technical-guide.md) | System architecture, module design, API reference, extension guide |
-| [User Manual](docs/user-guide.md) | Deployment (Windows 10 & Ubuntu), CLI/API usage, troubleshooting |
+| [技术开发文档](docs/technical-guide.md) | 系统架构、模块设计、API 参考、扩展指南（中文） |
+| [Technical Development Guide](docs/technical-guide_en.md) | System architecture, module design, API reference, extension guide (English) |
+| [使用手册](docs/user-guide.md) | 部署（Windows 10 & Ubuntu）、CLI/API 使用、故障排除（中文） |
+| [User Manual](docs/user-guide_en.md) | Deployment (Windows 10 & Ubuntu), CLI/API usage, troubleshooting (English) |
 
 ---
 
