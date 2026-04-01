@@ -24,7 +24,7 @@ MARS 采用四层分层架构，从用户接口到底层工具单向依赖，清
 │                                                               │
 │  ┌──────────────┐  ┌──────────────┐  ┌────────────────────┐  │
 │  │  SearchCrew  │  │ AnalysisCrew │  │  FullResearchCrew  │  │
-│  │  4 Tasks     │  │  2 Tasks     │  │  7 Tasks           │  │
+│  │  4 Tasks     │  │  2 Tasks     │  │  8 Tasks           │  │
 │  └──────────────┘  └──────────────┘  └────────────────────┘  │
 │          ↑ Sequential Process (CrewAI)                        │
 │  ┌────────────────┐                                           │
@@ -38,7 +38,7 @@ MARS 采用四层分层架构，从用户接口到底层工具单向依赖，清
 │                                                               │
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐          │
 │  │ Researcher  │  │  Searcher   │  │  Analyzer   │          │
-│  │  (Qwen)     │  │   (Kimi)    │  │   (Kimi)    │          │
+│  │  (Qwen)     │  │   (Qwen)    │  │   (Qwen)    │          │
 │  │  领域分析   │  │  论文检索   │  │  深度解析   │          │
 │  └─────────────┘  └─────────────┘  └─────────────┘          │
 │                                                               │
@@ -84,9 +84,9 @@ MARS 采用四层分层架构，从用户接口到底层工具单向依赖，清
 | Agent | Role | LLM | Key Tools |
 |-------|------|-----|-----------|
 | **Researcher** | 领域分析师 – identifies research domain, recommends CCF-ranked venues | Qwen (qwen3.5-flash) | `ccf_database_query`, `keyword_expander` |
-| **Searcher** | 论文检索师 – queries academic databases and ranks results | Kimi (kimi-k2.5) | `dblp_search`, `semantic_scholar_search`, `arxiv_search`, `keyword_expander` |
-| **Analyzer** | 深度分析师 – downloads PDFs, extracts contributions & experiments | Kimi (kimi-k2.5) | `arxiv_search`, `pdf_parser`, `semantic_scholar_search` |
-| **Connector** | 关联分析师 – builds citation networks, identifies clusters & trends | Qwen (qwen3.5-flash) | `citation_network_builder`, `semantic_scholar_search` |
+| **Searcher** | 论文检索师 – queries academic databases and ranks results | Qwen (qwen3.5-flash) | `dblp_search`, `semantic_scholar_search`, `arxiv_search`, `keyword_expander`, `file_writer` |
+| **Analyzer** | 深度分析师 – downloads PDFs, extracts contributions & experiments | Qwen (qwen3.5-flash) | `arxiv_search`, `pdf_parser`, `semantic_scholar_search`, `file_writer` |
+| **Connector** | 关联分析师 – builds citation networks, identifies clusters & trends | Qwen (qwen3.5-flash) | `citation_network_builder`, `semantic_scholar_search`, `file_writer` |
 | **Summarizer** | 综述生成师 – generates bilingual (EN + ZH) literature reviews | Qwen (qwen3.5-flash) | `file_writer` |
 | **Evaluator** | 质量评估师 – scores papers on novelty, depth, validity, writing | Kimi (kimi-k2.5) | `semantic_scholar_search`, `file_writer` |
 
@@ -119,7 +119,8 @@ User topic
   → Searcher (50 papers)
   → Analyzer (top 20) + Connector (all 50) + Evaluator (top 20)
   → Summarizer (English review ≥ 3000 words → Chinese translation)
-  → Output: 7 files including bilingual comprehensive review
+  → Summarizer (full synthesis report)
+  → Output: 8+ files including bilingual comprehensive review + synthesis report
 ```
 
 ---
@@ -293,13 +294,16 @@ MARS/
 │   │   └── file_manager.py    # File I/O utilities
 │   │
 │   ├── tasks/
-│   │   └── task_definitions.py # 7 task factory functions
+│   │   └── task_definitions.py # 8 task factory functions
 │   │
 │   ├── crews/
 │   │   ├── search_crew.py     # Workflow 1: Basic search (4 tasks)
 │   │   ├── analysis_crew.py   # Workflow 2: Deep analysis
 │   │   ├── connection_crew.py # Workflow 3: Connection analysis
-│   │   └── full_research_crew.py # Workflow 4: Full research (7 tasks)
+│   │   └── full_research_crew.py # Workflow 4: Full research (8 tasks)
+│   │
+│   ├── database/
+│   │   └── models.py          # SQLAlchemy models (CCFVenue, Paper)
 │   │
 │   ├── services/
 │   │   └── llm_gateway.py     # LLM gateway (4 providers + fallback)
@@ -328,7 +332,7 @@ MARS/
 ```bash
 pip install -e ".[dev]"
 pytest tests/ -v
-# 105 tests total across 4 test files (all pass without API keys)
+# 114 tests total across 4 test files (all pass without API keys)
 ```
 
 ---
@@ -340,7 +344,7 @@ pytest tests/ -v
 | **Alibaba Cloud (Qwen)** | qwen3.5-flash, qwen-max, qwen-plus | DashScope (OpenAI-compatible) |
 | **DeepSeek** | deepseek-chat, deepseek-coder | DeepSeek Open API (OpenAI-compatible) |
 | **Moonshot AI (Kimi)** | kimi-k2.5, moonshot-v1-8k | Moonshot API (OpenAI-compatible) |
-| **Zhipu AI (GLM)** | glm-4-plus, glm-4-air | Zhipu Open Platform (OpenAI-compatible) |
+| **Zhipu AI (GLM)** | glm-4.7-flash, glm-4-plus, glm-4-air | Zhipu Open Platform (OpenAI-compatible) |
 
 All providers are accessed via OpenAI-compatible APIs, making it easy to switch between them or add new providers.
 
