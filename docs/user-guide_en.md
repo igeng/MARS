@@ -1364,6 +1364,10 @@ This is the interactive documentation interface built into FastAPI. You can dire
 
 ### 7.3 Using curl
 
+> **Async API mode (v0.2.0)**: All workflow endpoints use a "submit-then-poll" pattern.
+> `POST` returns a `task_id` immediately; poll `GET /task/{task_id}` for status and results.
+> Long HTTP timeouts for slow workflows are no longer necessary.
+
 #### Health Check
 
 ```bash
@@ -1374,9 +1378,16 @@ curl http://localhost:8000/health
 #### Basic Search
 
 ```bash
+# 1. Submit task → returns task_id immediately
 curl -X POST http://localhost:8000/search \
   -H "Content-Type: application/json" \
   -d '{"topic": "federated learning privacy", "max_results": 20}'
+# Returns: {"task_id":"a1b2c3d4e5f6","status":"pending"}  (HTTP 202)
+
+# 2. Poll for status
+curl http://localhost:8000/task/a1b2c3d4e5f6
+# Returns: {"task_id":"a1b2c3d4e5f6","status":"running","result":"","error":""}
+# On completion: {"task_id":"...","status":"success","result":"...","error":""}
 ```
 
 #### Deep Analysis
@@ -1403,27 +1414,39 @@ curl -X POST http://localhost:8000/full-research \
   -d '{"topic": "knowledge graph embedding methods"}'
 ```
 
-> **Note**: The full research workflow may take several minutes to over ten minutes. Please wait patiently for the response.
+> **Tip**: All workflow endpoints return HTTP 202 (Accepted) + `task_id`.
+> Use `GET /task/{task_id}` to poll; `status` transitions: `pending` → `running` → `success` / `failed`.
 
 ### 7.4 Using Python requests
 
 ```python
 import requests
+import time
 
-# Basic search
-response = requests.post(
-    "http://localhost:8000/search",
+BASE = "http://localhost:8000"
+
+# 1. Submit task
+resp = requests.post(
+    f"{BASE}/search",
     json={"topic": "deep learning for NLP", "max_results": 20}
 )
-print(response.json())
+task = resp.json()
+task_id = task["task_id"]
+print(f"Task submitted: {task_id}")
 
-# Full research
-response = requests.post(
-    "http://localhost:8000/full-research",
-    json={"topic": "federated learning privacy"}
-)
-result = response.json()
-print(result["result"])
+# 2. Poll until done
+while True:
+    resp = requests.get(f"{BASE}/task/{task_id}")
+    status = resp.json()
+    if status["status"] in ("success", "failed"):
+        break
+    print(f"Status: {status['status']}...")
+    time.sleep(5)
+
+if status["status"] == "success":
+    print(status["result"])
+else:
+    print(f"Failed: {status['error']}")
 ```
 
 ---
@@ -1625,9 +1648,19 @@ DEFAULT_LLM_PROVIDER=deepseek  # Change to the provider whose API Key you have
 
 ### Q3: API Call Timeout
 
-The full research workflow can take 10–20 minutes. When using curl, increase the timeout:
+Since v0.2.0, all workflow APIs are asynchronous — `POST` returns a `task_id` immediately
+and the result is retrieved via `GET /task/{task_id}` polling. Long HTTP timeouts are no longer needed.
+
 ```bash
-curl --max-time 1200 -X POST http://localhost:8000/full-research ...
+# Submit the job
+curl -X POST http://localhost:8000/full-research \
+  -H "Content-Type: application/json" \
+  -d '{"topic": "..."}'
+# → {"task_id": "abc123", "status": "pending"}
+
+# Poll every 5–10 seconds until done
+curl http://localhost:8000/task/abc123
+# → status: "pending" → "running" → "success" / "failed"
 ```
 
 ### Q4: Paper Search Returns No Results

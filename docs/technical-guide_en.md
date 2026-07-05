@@ -177,9 +177,12 @@ MARS/
 │   │   ├── summarizer.py          # Review generator (bilingual output)
 │   │   └── evaluator.py           # Quality evaluator
 │   │
+│   ├── data/                      # Static data files
+│   │   └── ccf_2025.json          # CCF venue list (JSON, version-switchable)
+│   │
 │   ├── tools/                     # 9 tools
 │   │   ├── __init__.py
-│   │   ├── ccf_database.py        # CCF ranking database
+│   │   ├── ccf_database.py        # CCF ranking database (loads from JSON)
 │   │   ├── dblp_search.py         # DBLP search
 │   │   ├── semantic_scholar.py    # Semantic Scholar search
 │   │   ├── arxiv_api.py           # arXiv search
@@ -190,14 +193,18 @@ MARS/
 │   │
 │   ├── tasks/                     # Task definitions
 │   │   ├── __init__.py
-│   │   └── task_definitions.py    # 7 task factory functions
+│   │   ├── task_definitions.py    # 8 task factory functions
+│   │   └── prompts/               # Prompt template files (txt)
+│   │       ├── domain_analysis_task.txt
+│   │       ├── paper_search_task.txt
+│   │       └── … (8 templates total)
 │   │
 │   ├── crews/                     # 4 workflows
 │   │   ├── __init__.py
 │   │   ├── search_crew.py         # Basic search (4 tasks)
 │   │   ├── analysis_crew.py       # Deep analysis
 │   │   ├── connection_crew.py     # Connection analysis
-│   │   └── full_research_crew.py  # Full research (7 tasks)
+│   │   └── full_research_crew.py  # Full research (8 tasks)
 │   │
 │   ├── database/                  # Database
 │   │   ├── __init__.py
@@ -205,20 +212,23 @@ MARS/
 │   │
 │   ├── utils/                     # Utility functions
 │   │   ├── __init__.py
-│   │   ├── llm_factory.py         # LLM factory (compatibility layer)
-│   │   ├── logging_config.py      # Centralized logging configuration
+│   │   ├── llm_factory.py         # LLM factory (⚠ deprecated, remove in v0.3.0)
+│   │   ├── logging_config.py      # Centralized logging (with run_id injection)
 │   │   └── retry.py               # Exponential backoff retry decorator
 │   │
-│   └── api/                       # Web API
-│       ├── __init__.py
-│       └── main.py                # FastAPI application
+│   ├── api/                       # Web API
+│   │   ├── __init__.py
+│   │   └── main.py                # FastAPI app (async task mode)
+│   │
+│   └── py.typed                   # PEP 561 type marker
 │
 └── tests/                         # Tests
     ├── __init__.py
     ├── conftest.py                # Shared fixtures and mocks
     ├── test_basic.py              # Basic component tests
     ├── test_new_components.py     # New component tests (Settings, LLM Gateway, DB, API, Tasks)
-    └── test_usage_features.py     # Usage feature tests
+    ├── test_usage_features.py     # Usage feature tests
+    └── test_gateway_and_crews.py  # RateLimitAwareLLM + crew orchestration tests
 ```
 
 ---
@@ -351,7 +361,7 @@ All tools inherit from CrewAI's `BaseTool` class and define `name`, `description
 
 | Tool | Module | External Dependency | Requires API Key |
 |------|--------|---------------------|------------------|
-| CCFDatabaseQueryTool | `ccf_database.py` | None (built-in data) | No |
+| CCFDatabaseQueryTool | `ccf_database.py` | None (loads from `mars/data/ccf_*.json`; version-switchable) | No |
 | DBLPSearchTool | `dblp_search.py` | DBLP REST API | No |
 | SemanticScholarSearchTool | `semantic_scholar.py` | S2 Graph API | Optional |
 | ArXivSearchTool | `arxiv_api.py` | arXiv Atom API | No |
@@ -387,7 +397,10 @@ All search tools accept a JSON string as input:
 
 ### 6.1 Task Factory Pattern
 
-`mars/tasks/task_definitions.py` provides 7 task factory functions:
+`mars/tasks/task_definitions.py` provides 8 task factory functions. Prompt text
+is loaded from `mars/tasks/prompts/*.txt` template files (using `str.format()`
+placeholders); non-developers can edit the `.txt` files to adjust prompts
+without touching Python code:
 
 ```python
 def create_domain_analysis_task(agent, topic, *, context=None) -> Task
@@ -494,15 +507,21 @@ Phase 3:  Summarizer (english_review_task → chinese_review_task)
 ```python
 _AGENT_LLM_MAP = {
     "researcher": ("qwen", None),    # Strong reasoning → Qwen (qwen3.5-flash)
-    "searcher":   ("kimi", None),    # Long-context retrieval → Kimi (kimi-k2.5)
-    "analyzer":   ("kimi", None),    # Long-context deep analysis → Kimi (kimi-k2.5)
-    "connector":  ("qwen", None),    # Relational reasoning → Qwen (qwen3.5-flash)
-    "summarizer": ("qwen", None),    # Long-form generation → Qwen (qwen3.5-flash)
+    "searcher":   ("qwen", None),    # Long-context retrieval → Qwen
+    "analyzer":   ("qwen", None),    # Long-context deep analysis → Qwen
+    "connector":  ("qwen", None),    # Relational reasoning → Qwen
+    "summarizer": ("qwen", None),    # Long-form generation → Qwen
     "evaluator":  ("kimi", None),    # Evaluation tasks → Kimi (kimi-k2.5)
 }
 ```
 
 When the preferred provider's API key is not configured, the gateway automatically falls back to `DEFAULT_LLM_PROVIDER`, then to any available provider.
+
+`RateLimitAwareLLM` (a `crewai.LLM` subclass) provides per-call exponential backoff retry
+and automatic fallback to alternate providers for rate-limit scenarios (used for GLM free-tier).
+The `call()` method uses `*args, **kwargs` to stay decoupled from CrewAI internals.
+`mars/utils/llm_factory.py` is a backwards-compatibility shim (to be removed in v0.3.0);
+new code should import from `mars.services.llm_gateway` directly.
 
 ### 8.4 Usage
 
@@ -619,6 +638,7 @@ class MarsSettings(BaseSettings):
     DEFAULT_LLM_PROVIDER: str = "qwen"
     LOG_LEVEL: str = "INFO"
     OUTPUT_DIR: Path = Path("./output")
+    AGENT_MAX_ITER: int = Field(default=10, ge=1)  # Max tool-call iterations per agent
 
     # GLM rate-limit handling
     GLM_RATE_LIMIT_MAX_RETRIES: int = 3       # Number of retries on RateLimitError
@@ -658,51 +678,51 @@ print(settings.MAX_PAPERS_PER_SEARCH)
 
 ### 11.2 Endpoint List
 
+All workflow endpoints use an **async task pattern**: `POST` returns a `task_id`
+immediately (HTTP 202); poll `GET /task/{task_id}` for status and results.
+
 | Method | Path | Request Body | Description |
 |--------|------|--------------|-------------|
 | GET | `/health` | None | Health check |
-| POST | `/search` | `SearchRequest` | Basic search |
-| POST | `/analyze` | `AnalyzeRequest` | Deep analysis |
-| POST | `/connect` | `ConnectRequest` | Connection analysis |
-| POST | `/full-research` | `FullResearchRequest` | Full research |
+| GET | `/task/{task_id}` | None | Poll task status |
+| POST | `/search` | `SearchRequest` | Basic search (async) |
+| POST | `/analyze` | `AnalyzeRequest` | Deep analysis (async) |
+| POST | `/connect` | `ConnectRequest` | Connection analysis (async) |
+| POST | `/full-research` | `FullResearchRequest` | Full research (async) |
 
 ### 11.3 Request/Response Models
 
 ```python
-# Requests
+# Requests (same as before)
 class SearchRequest(BaseModel):
     topic: str            # Research topic
     max_results: int = 50 # Maximum number of results (1–200)
 
-class AnalyzeRequest(BaseModel):
-    papers_info: str      # Paper information
-    max_papers: int = 20  # Maximum papers to analyze (1–100)
+# POST response (async mode)
+class TaskAcceptedResponse(BaseModel):
+    task_id: str          # Task ID (12 hex chars)
+    status: str           # "pending"
 
-class ConnectRequest(BaseModel):
-    papers_info: str      # Paper information
-    topic: str            # Research topic
-
-class FullResearchRequest(BaseModel):
-    topic: str            # Research topic
-
-# Response
-class TaskResponse(BaseModel):
-    status: str = "success"
-    result: str           # Task result string
+# GET /task/{task_id} response
+class TaskInfo(BaseModel):
+    task_id: str
+    status: TaskStatus    # "pending" | "running" | "success" | "failed"
+    result: str           # Result text (only when status == "success")
+    error: str            # Error message (only when status == "failed")
 ```
 
 ### 11.4 Usage Examples
 
 ```bash
-# Basic search
+# Submit a search task
 curl -X POST http://localhost:8000/search \
   -H "Content-Type: application/json" \
   -d '{"topic": "federated learning privacy", "max_results": 20}'
+# → {"task_id":"a1b2c3d4e5f6","status":"pending"}
 
-# Full research
-curl -X POST http://localhost:8000/full-research \
-  -H "Content-Type: application/json" \
-  -d '{"topic": "graph neural network for recommendation"}'
+# Poll task status
+curl http://localhost:8000/task/a1b2c3d4e5f6
+# → {"task_id":"a1b2c3d4e5f6","status":"running","result":"","error":""}
 ```
 
 ---

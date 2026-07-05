@@ -82,12 +82,15 @@ MARS/
 │   └── technical-guide.md   # 技术指南
 ├── mars/
 │   ├── __init__.py
-│   ├── cli.py               # CLI 入口（typer app）
+│   ├── cli.py               # CLI 入口（typer app，含 _run_workflow 通用执行器）
+│   ├── py.typed             # PEP 561 类型标记
 │   ├── config/
 │   │   ├── __init__.py      # 导出 settings 单例
 │   │   └── settings.py      # MarsSettings（pydantic-settings）
 │   ├── services/
-│   │   └── llm_gateway.py   # LLM 工厂 + 路由 + 回退逻辑
+│   │   └── llm_gateway.py   # LLM 工厂 + 路由 + 限流回退（RateLimitAwareLLM）
+│   ├── data/
+│   │   └── ccf_2025.json    # CCF 期刊/会议列表（JSON，支持版本切换）
 │   ├── agents/
 │   │   ├── researcher.py    # 领域分析师
 │   │   ├── searcher.py      # 论文检索师
@@ -96,36 +99,46 @@ MARS/
 │   │   ├── evaluator.py     # 质量评估师
 │   │   └── summarizer.py    # 综述生成师
 │   ├── tasks/
-│   │   └── task_definitions.py  # 所有任务工厂函数（7 类任务）
+│   │   ├── task_definitions.py  # 所有任务工厂函数（8 类任务）
+│   │   └── prompts/             # Prompt 模板文件（.txt，str.format 占位符）
+│   │       ├── domain_analysis_task.txt
+│   │       ├── paper_search_task.txt
+│   │       ├── deep_analysis_task.txt
+│   │       ├── connection_analysis_task.txt
+│   │       ├── english_review_task.txt
+│   │       ├── review_generation_task.txt
+│   │       ├── quality_evaluation_task.txt
+│   │       └── full_research_synthesis_task.txt
 │   ├── crews/
 │   │   ├── search_crew.py       # 基础检索流程（3 智能体）
 │   │   ├── analysis_crew.py     # 深度分析流程（2 智能体）
 │   │   ├── connection_crew.py   # 关联分析流程（2 智能体）
-│   │   └── full_research_crew.py # 完整研究流程（6 智能体）
+│   │   └── full_research_crew.py # 完整研究流程（6 智能体，8 任务顺序执行）
 │   ├── tools/
 │   │   ├── arxiv_api.py         # arXiv 检索工具
 │   │   ├── dblp_search.py       # DBLP 检索工具
 │   │   ├── semantic_scholar.py  # Semantic Scholar 检索工具
 │   │   ├── citation_network.py  # 引用网络构建工具
 │   │   ├── keyword_expander.py  # 关键词扩展工具（调用 LLM）
-│   │   ├── ccf_database.py      # CCF 场馆静态数据库
+│   │   ├── ccf_database.py      # CCF 场馆（从 JSON 加载，内置回退数据）
 │   │   ├── pdf_parser.py        # PDF 解析工具
 │   │   └── file_manager.py      # 文件读写工具
 │   ├── api/
 │   │   ├── __init__.py
-│   │   └── main.py              # FastAPI 应用（4 个端点）
+│   │   └── main.py              # FastAPI 应用（异步任务模式，6 个端点）
 │   ├── database/
 │   │   ├── __init__.py
 │   │   └── models.py            # SQLAlchemy 模型（CCFVenue、Paper）
 │   └── utils/
-│       ├── logging_config.py    # 集中日志配置
-│       ├── llm_factory.py       # get_llm() 封装（供工具直调）
+│       ├── logging_config.py    # 集中日志配置（支持 run_id 注入）
+│       ├── llm_factory.py       # ⚠️ 已废弃兼容层（v0.3.0 移除）
 │       └── retry.py             # HTTP 重试装饰器
 └── tests/
     ├── conftest.py
     ├── test_basic.py
     ├── test_new_components.py
-    └── test_usage_features.py
+    ├── test_usage_features.py
+    └── test_gateway_and_crews.py  # RateLimitAwareLLM + Crew 编排测试
 ```
 
 ---
@@ -188,6 +201,7 @@ settings.GLM_MODEL                # str，默认 "glm-4.7-flash"
 
 settings.DEFAULT_LLM_PROVIDER     # str，默认 "qwen"
 settings.OUTPUT_DIR               # Path，默认 "./output"
+settings.AGENT_MAX_ITER           # int，默认 10（所有 Agent 的 max_iter）
 settings.MAX_PAPERS_PER_SEARCH    # int，默认 50
 settings.MAX_PAPERS_FOR_ANALYSIS  # int，默认 20
 settings.ARXIV_SEARCH_TIMEOUT     # int，默认 30（秒）
@@ -263,9 +277,14 @@ extra_body={"enable_thinking": False}
 
 ### RateLimitAwareLLM
 
-专为 GLM 设计的 `crewai.LLM` 子类，覆写 `call()` 方法，实现：
-1. 指数退避重试（最多 `GLM_RATE_LIMIT_MAX_RETRIES` 次）
-2. 耗尽重试后按序切换到 Qwen → Kimi 回退链
+`crewai.LLM` 子类，专为 GLM 等免费模型设计，提供限流保护：
+
+1. **指数退避重试**（最多 `GLM_RATE_LIMIT_MAX_RETRIES` 次）
+2. **自动回退链**：耗尽重试后按序切换到 Qwen → Kimi
+3. **签名解耦**：`call(*args, **kwargs)` 签名与 CrewAI 内部接口解耦，版本升级不会导致静默错误
+
+`mars/utils/llm_factory.py` 为向后兼容层（⚠️ v0.3.0 将移除），新代码应直接从
+`mars.services.llm_gateway` 导入。
 
 ---
 
@@ -275,14 +294,15 @@ extra_body={"enable_thinking": False}
 
 | 文件 | Agent 角色 | LLM | max_iter | 工具 |
 |------|-----------|-----|---------|------|
-| `researcher.py` | 领域分析师 | qwen | 5 | CCFDatabaseQueryTool, KeywordExpanderTool |
-| `searcher.py` | 论文检索师 | qwen | 8 | DBLPSearchTool, SemanticScholarSearchTool, ArXivSearchTool, KeywordExpanderTool, FileWriterTool |
+| `researcher.py` | 领域分析师 | qwen | 10 | CCFDatabaseQueryTool, KeywordExpanderTool |
+| `searcher.py` | 论文检索师 | qwen | 10 | DBLPSearchTool, SemanticScholarSearchTool, ArXivSearchTool, KeywordExpanderTool, FileWriterTool |
 | `analyzer.py` | 深度分析师 | qwen | 10 | ArXivSearchTool, SemanticScholarSearchTool, PDFParserTool, FileWriterTool |
-| `connector.py` | 关联分析师 | qwen | 8 | CitationNetworkTool, SemanticScholarSearchTool, FileWriterTool |
-| `evaluator.py` | 质量评估师 | kimi | 8 | SemanticScholarSearchTool, FileWriterTool |
-| `summarizer.py` | 综述生成师 | qwen | 8 | FileWriterTool |
+| `connector.py` | 关联分析师 | qwen | 10 | CitationNetworkTool, SemanticScholarSearchTool, FileWriterTool |
+| `evaluator.py` | 质量评估师 | kimi | 10 | SemanticScholarSearchTool, FileWriterTool |
+| `summarizer.py` | 综述生成师 | qwen | 10 | FileWriterTool |
 
-所有 Agent 均设置 `allow_delegation=False` 和 `verbose=True`。
+所有 Agent 的 `max_iter` 值由 `settings.AGENT_MAX_ITER` 统一控制（默认 10），
+可通过 `.env` 环境变量覆盖。所有 Agent 均设置 `allow_delegation=False` 和 `verbose=True`。
 
 ---
 
@@ -469,27 +489,36 @@ mars check                          # 检查系统配置状态
 
 使用 `FastAPI`，通过 `create_app()` 工厂函数创建应用实例，模块级 `app = create_app()` 供 `uvicorn mars.api.main:app` 使用。
 
-### 端点
+### 端点（异步任务模式，v0.2.0）
+
+所有工作流端点使用"提交-轮询"模式：`POST` 返回 HTTP 202 + `task_id`，
+通过 `GET /task/{task_id}` 轮询结果。
 
 | 方法 | 路径 | 请求体类型 | 说明 |
 |------|------|----------|------|
 | GET | `/health` | — | 健康检查 |
-| POST | `/search` | `SearchRequest` | 基础检索 |
-| POST | `/analyze` | `AnalyzeRequest` | 深度分析 |
-| POST | `/connect` | `ConnectRequest` | 关联分析 |
-| POST | `/full-research` | `FullResearchRequest` | 完整研究 |
+| GET | `/task/{task_id}` | — | 查询任务状态与结果 |
+| POST | `/search` | `SearchRequest` | 基础检索（异步） |
+| POST | `/analyze` | `AnalyzeRequest` | 深度分析（异步） |
+| POST | `/connect` | `ConnectRequest` | 关联分析（异步） |
+| POST | `/full-research` | `FullResearchRequest` | 完整研究（异步） |
 
 ### 请求/响应模型
 
 ```python
-# 请求示例
+# 请求示例（不变）
 SearchRequest(topic="federated learning", max_results=50)
-AnalyzeRequest(papers_info="...", topic="", max_papers=20)
-ConnectRequest(papers_info="...", topic="federated learning")
-FullResearchRequest(topic="federated learning privacy")
 
-# 统一响应
-TaskResponse(status="success", result="<markdown string>")
+# POST 响应（新）
+TaskAcceptedResponse(task_id="a1b2c3d4e5f6", status="pending")
+
+# GET /task/{task_id} 响应
+TaskInfo(
+    task_id="a1b2c3d4e5f6",
+    status="success",        # pending → running → success/failed
+    result="<result text>",  # 仅在 status=success 时有值
+    error=""                 # 仅在 status=failed 时有值
+)
 ```
 
 ### Swagger UI
@@ -586,7 +615,7 @@ def _call_api():
 
 ## 15. 测试
 
-测试文件位于 `tests/`，使用 `pytest`，共 4 个文件，约 105 个测试用例。
+测试文件位于 `tests/`，使用 `pytest`，共 5 个文件，约 135 个测试用例。
 
 ```bash
 python -m pytest tests/ -v
@@ -595,7 +624,8 @@ python -m pytest tests/ -v
 **关键特性**：
 - 所有测试**不需要真实 API key**（工具被 mock）
 - `conftest.py` 提供公共 fixtures
-- 覆盖：设置验证、工具调用、智能体创建、Crew 组装、CLI 命令、API 端点
+- 覆盖：设置验证、工具调用、智能体创建、Crew 组装、CLI 命令、API 端点、
+  RateLimitAwareLLM 重试/回退逻辑、CCF JSON 加载、Prompt 模板加载
 
 ---
 

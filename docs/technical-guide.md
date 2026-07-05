@@ -177,9 +177,12 @@ MARS/
 │   │   ├── summarizer.py          # 综述生成师（双语输出）
 │   │   └── evaluator.py           # 质量评估师
 │   │
+│   ├── data/                      # 静态数据文件
+│   │   └── ccf_2025.json          # CCF 推荐期刊/会议列表 (JSON)
+│   │
 │   ├── tools/                     # 9 个工具
 │   │   ├── __init__.py
-│   │   ├── ccf_database.py        # CCF 排名数据库
+│   │   ├── ccf_database.py        # CCF 排名数据库（从 JSON 加载）
 │   │   ├── dblp_search.py         # DBLP 搜索
 │   │   ├── semantic_scholar.py    # Semantic Scholar 搜索
 │   │   ├── arxiv_api.py           # arXiv 搜索
@@ -190,14 +193,18 @@ MARS/
 │   │
 │   ├── tasks/                     # 任务定义
 │   │   ├── __init__.py
-│   │   └── task_definitions.py    # 7 个任务工厂函数
+│   │   ├── task_definitions.py    # 8 个任务工厂函数
+│   │   └── prompts/               # Prompt 模板文件 (txt)
+│   │       ├── domain_analysis_task.txt
+│   │       ├── paper_search_task.txt
+│   │       └── ...（共 8 个）
 │   │
 │   ├── crews/                     # 4 个工作流
 │   │   ├── __init__.py
 │   │   ├── search_crew.py         # 基础检索（4 个任务）
 │   │   ├── analysis_crew.py       # 深度分析
 │   │   ├── connection_crew.py     # 关联分析
-│   │   └── full_research_crew.py  # 完整研究（7 个任务）
+│   │   └── full_research_crew.py  # 完整研究（8 个任务）
 │   │
 │   ├── database/                  # 数据库
 │   │   ├── __init__.py
@@ -205,13 +212,15 @@ MARS/
 │   │
 │   ├── utils/                     # 工具函数
 │   │   ├── __init__.py
-│   │   ├── llm_factory.py         # LLM 工厂（兼容层）
-│   │   ├── logging_config.py      # 集中式日志配置
+│   │   ├── llm_factory.py         # LLM 工厂（⚠️ 已废弃，v0.3.0 移除）
+│   │   ├── logging_config.py      # 集中式日志配置（支持 run_id 注入）
 │   │   └── retry.py               # 指数退避重试装饰器
 │   │
-│   └── api/                       # Web API
-│       ├── __init__.py
-│       └── main.py                # FastAPI 应用
+│   ├── api/                       # Web API
+│   │   ├── __init__.py
+│   │   └── main.py                # FastAPI 应用（异步任务模式）
+│   │
+│   └── py.typed                   # PEP 561 类型标记文件
 │
 └── tests/                         # 测试
     ├── __init__.py
@@ -351,7 +360,7 @@ Agent(
 
 | 工具 | 模块 | 外部依赖 | 需要 API Key |
 |------|------|----------|-------------|
-| CCFDatabaseQueryTool | `ccf_database.py` | 无（内置数据） | 否 |
+| CCFDatabaseQueryTool | `ccf_database.py` | 无（从 `mars/data/ccf_*.json` 加载，支持版本切换） | 否 |
 | DBLPSearchTool | `dblp_search.py` | DBLP REST API | 否 |
 | SemanticScholarSearchTool | `semantic_scholar.py` | S2 Graph API | 可选 |
 | ArXivSearchTool | `arxiv_api.py` | arXiv Atom API | 否 |
@@ -387,7 +396,9 @@ Agent(
 
 ### 6.1 任务工厂模式
 
-`mars/tasks/task_definitions.py` 提供 7 个任务工厂函数：
+`mars/tasks/task_definitions.py` 提供 8 个任务工厂函数，Prompt 文本从
+`mars/tasks/prompts/*.txt` 模板文件加载（使用 `str.format()` 占位符），
+非开发人员可直接编辑 `.txt` 文件调整 Prompt 而无需修改 Python 代码：
 
 ```python
 def create_domain_analysis_task(agent, topic, *, context=None) -> Task
@@ -397,6 +408,7 @@ def create_connection_analysis_task(agent, topic, papers_info="", *, context=Non
 def create_english_review_task(agent, topic, *, context=None) -> Task     # 英文综述（≥ 3000 字）
 def create_review_generation_task(agent, topic, *, context=None) -> Task  # 中文翻译综述
 def create_quality_evaluation_task(agent, limit=20, *, context=None) -> Task
+def create_full_research_synthesis_task(agent, topic, *, context=None) -> Task  # 综合研究报告
 ```
 
 ### 6.2 任务链上下文传递
@@ -494,15 +506,19 @@ Phase 3:  Summarizer (english_review_task → chinese_review_task)
 ```python
 _AGENT_LLM_MAP = {
     "researcher": ("qwen", None),    # 强推理 → Qwen (qwen3.5-flash)
-    "searcher":   ("kimi", None),    # 长上下文检索综合 → Kimi (kimi-k2.5)
-    "analyzer":   ("kimi", None),    # 长上下文深度分析 → Kimi (kimi-k2.5)
-    "connector":  ("qwen", None),    # 关系推理 → Qwen (qwen3.5-flash)
-    "summarizer": ("qwen", None),    # 长文本生成 → Qwen (qwen3.5-flash)
+    "searcher":   ("qwen", None),    # 长上下文检索综合 → Qwen
+    "analyzer":   ("qwen", None),    # 长上下文深度分析 → Qwen
+    "connector":  ("qwen", None),    # 关系推理 → Qwen
+    "summarizer": ("qwen", None),    # 长文本生成 → Qwen
     "evaluator":  ("kimi", None),    # 评估任务 → Kimi (kimi-k2.5)
 }
 ```
 
 当首选供应商的 API Key 未配置时，网关自动回退到 `DEFAULT_LLM_PROVIDER`，再回退到任意可用供应商。
+
+`RateLimitAwareLLM`（`crewai.LLM` 子类）为每个调用提供指数退避重试和自动切换备用供应商的限流保护，
+用于 GLM 等免费模型场景。`call()` 方法使用 `*args, **kwargs` 签名以解耦 CrewAI 内部接口。`mars/utils/llm_factory.py`
+为向后兼容层（v0.3.0 将移除），新代码应直接从 `mars.services.llm_gateway` 导入。
 
 ### 8.4 使用方式
 
@@ -517,6 +533,11 @@ llm: ChatOpenAI = get_llm(provider="qwen", temperature=0.3)
 # 通过智能体角色获取 crewai.LLM（推荐，用于 CrewAI Agent）
 llm: LLM = get_llm_by_task("researcher", temperature=0.3)
 ```
+
+### 8.5 Agent max_iter 配置
+
+所有 Agent 的 `max_iter` 值由 `settings.AGENT_MAX_ITER` 统一控制（默认 10），
+可通过 `.env` 文件覆盖：`AGENT_MAX_ITER=15`
 
 ---
 
@@ -619,6 +640,7 @@ class MarsSettings(BaseSettings):
     DEFAULT_LLM_PROVIDER: str = "qwen"
     LOG_LEVEL: str = "INFO"
     OUTPUT_DIR: Path = Path("./output")
+    AGENT_MAX_ITER: int = Field(default=10, ge=1)  # Agent 最大工具调用迭代次数
 
     # GLM 限流处理
     GLM_RATE_LIMIT_MAX_RETRIES: int = 3       # RateLimitError 重试次数
@@ -658,51 +680,51 @@ print(settings.MAX_PAPERS_PER_SEARCH)
 
 ### 11.2 端点列表
 
+所有工作流端点采用**异步任务模式**：`POST` 立即返回 `task_id`（HTTP 202），
+通过 `GET /task/{task_id}` 轮询状态和结果。
+
 | 方法 | 路径 | 请求体 | 说明 |
 |------|------|--------|------|
 | GET | `/health` | 无 | 健康检查 |
-| POST | `/search` | `SearchRequest` | 基础检索 |
-| POST | `/analyze` | `AnalyzeRequest` | 深度分析 |
-| POST | `/connect` | `ConnectRequest` | 关联分析 |
-| POST | `/full-research` | `FullResearchRequest` | 完整研究 |
+| GET | `/task/{task_id}` | 无 | 查询任务状态 |
+| POST | `/search` | `SearchRequest` | 基础检索（异步） |
+| POST | `/analyze` | `AnalyzeRequest` | 深度分析（异步） |
+| POST | `/connect` | `ConnectRequest` | 关联分析（异步） |
+| POST | `/full-research` | `FullResearchRequest` | 完整研究（异步） |
 
 ### 11.3 请求/响应模型
 
 ```python
-# 请求
+# 请求（与旧版相同）
 class SearchRequest(BaseModel):
     topic: str            # 研究主题
     max_results: int = 50 # 最大结果数 (1-200)
 
-class AnalyzeRequest(BaseModel):
-    papers_info: str      # 论文信息
-    max_papers: int = 20  # 最大分析数 (1-100)
+# POST 响应（异步模式）
+class TaskAcceptedResponse(BaseModel):
+    task_id: str          # 任务 ID（12 位 hex）
+    status: str           # "pending"
 
-class ConnectRequest(BaseModel):
-    papers_info: str      # 论文信息
-    topic: str            # 研究主题
-
-class FullResearchRequest(BaseModel):
-    topic: str            # 研究主题
-
-# 响应
-class TaskResponse(BaseModel):
-    status: str = "success"
-    result: str           # 任务结果字符串
+# GET /task/{task_id} 响应
+class TaskInfo(BaseModel):
+    task_id: str
+    status: TaskStatus    # "pending" | "running" | "success" | "failed"
+    result: str           # 结果文本（仅在 success 时）
+    error: str            # 错误信息（仅在 failed 时）
 ```
 
 ### 11.4 调用示例
 
 ```bash
-# 基础检索
+# 提交基础检索任务
 curl -X POST http://localhost:8000/search \
   -H "Content-Type: application/json" \
   -d '{"topic": "federated learning privacy", "max_results": 20}'
+# → {"task_id":"a1b2c3d4e5f6","status":"pending"}
 
-# 完整研究
-curl -X POST http://localhost:8000/full-research \
-  -H "Content-Type: application/json" \
-  -d '{"topic": "graph neural network for recommendation"}'
+# 轮询任务状态
+curl http://localhost:8000/task/a1b2c3d4e5f6
+# → {"task_id":"a1b2c3d4e5f6","status":"running","result":"","error":""}
 ```
 
 ---
@@ -873,7 +895,8 @@ python -m pytest tests/ --cov=mars --cov-report=html
 1. 在 `mars/agents/` 创建 `new_agent.py`
 2. 实现 `create_new_agent()` 工厂函数
 3. 在 `mars/services/llm_gateway.py` 的 `_AGENT_LLM_MAP` 添加映射
-4. 在 `mars/tasks/task_definitions.py` 添加对应任务工厂
+4. 在 `mars/tasks/prompts/` 添加 Prompt 模板文件（`.txt`），
+   并在 `task_definitions.py` 中通过 `_load_prompt()` 加载
 5. 在相关 Crew 中组装 Agent 和 Task
 6. 在 `tests/` 中添加测试
 

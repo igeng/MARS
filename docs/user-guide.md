@@ -1363,6 +1363,10 @@ mars api --port 8000
 
 ### 7.3 使用 curl 调用
 
+> **API 异步模式（v0.2.0）**：所有工作流端点采用"提交-轮询"模式。
+> `POST` 请求立即返回 `task_id`，随后通过 `GET /task/{task_id}` 查询状态和结果。
+> 不再需要为长时间运行的工作流设置 HTTP 超时。
+
 #### 健康检查
 
 ```bash
@@ -1373,9 +1377,16 @@ curl http://localhost:8000/health
 #### 基础检索
 
 ```bash
+# 1. 提交任务 → 立即返回 task_id
 curl -X POST http://localhost:8000/search \
   -H "Content-Type: application/json" \
   -d '{"topic": "federated learning privacy", "max_results": 20}'
+# 返回: {"task_id":"a1b2c3d4e5f6","status":"pending"}  (HTTP 202)
+
+# 2. 轮询任务状态
+curl http://localhost:8000/task/a1b2c3d4e5f6
+# 返回: {"task_id":"a1b2c3d4e5f6","status":"running","result":"","error":""}
+# 完成后: {"task_id":"a1b2c3d4e5f6","status":"success","result":"...","error":""}
 ```
 
 #### 深度分析
@@ -1402,27 +1413,39 @@ curl -X POST http://localhost:8000/full-research \
   -d '{"topic": "knowledge graph embedding methods"}'
 ```
 
-> **注意**：完整研究流程可能需要几分钟到十几分钟，请耐心等待响应。
+> **提示**：所有工作流端点统一返回 HTTP 202 (Accepted) + `task_id`。
+> 使用 `GET /task/{task_id}` 轮询结果，`status` 字段取值：`pending` → `running` → `success` / `failed`。
 
 ### 7.4 使用 Python requests 调用
 
 ```python
 import requests
+import time
 
-# 基础检索
-response = requests.post(
-    "http://localhost:8000/search",
+BASE = "http://localhost:8000"
+
+# 1. 提交任务
+resp = requests.post(
+    f"{BASE}/search",
     json={"topic": "deep learning for NLP", "max_results": 20}
 )
-print(response.json())
+task = resp.json()
+task_id = task["task_id"]
+print(f"任务已提交: {task_id}")
 
-# 完整研究
-response = requests.post(
-    "http://localhost:8000/full-research",
-    json={"topic": "federated learning privacy"}
-)
-result = response.json()
-print(result["result"])
+# 2. 轮询直到完成
+while True:
+    resp = requests.get(f"{BASE}/task/{task_id}")
+    status = resp.json()
+    if status["status"] in ("success", "failed"):
+        break
+    print(f"状态: {status['status']}...")
+    time.sleep(5)
+
+if status["status"] == "success":
+    print(status["result"])
+else:
+    print(f"失败: {status['error']}")
 ```
 
 ---
@@ -1624,9 +1647,19 @@ DEFAULT_LLM_PROVIDER=deepseek  # 改为你有 API Key 的供应商
 
 ### Q3: API 调用返回超时
 
-完整研究流程可能需要 10-20 分钟。使用 curl 时增加超时时间：
+自 v0.2.0 起，所有工作流 API 采用异步模式——`POST` 立即返回 `task_id`，不再阻塞等待结果。
+只需通过 `GET /task/{task_id}` 轮询状态即可，无需设置 HTTP 长超时。
+
 ```bash
-curl --max-time 1200 -X POST http://localhost:8000/full-research ...
+# 旧方式（不再需要）：curl --max-time 1200 -X POST ...
+# 新方式：先 POST 获取 task_id，再 GET 轮询
+curl -X POST http://localhost:8000/full-research \
+  -H "Content-Type: application/json" \
+  -d '{"topic": "..."}'
+# → {"task_id": "abc123", "status": "pending"}
+
+curl http://localhost:8000/task/abc123
+# → 每 5-10 秒查询一次，直到 status 变为 "success" 或 "failed"
 ```
 
 ### Q4: 论文检索结果为空
