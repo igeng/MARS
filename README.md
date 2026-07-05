@@ -198,29 +198,43 @@ pip install -e .
 
 ### 2. Configure API Keys
 
+> ⚠️ **Security reminder**: Never hard-code real API keys in configuration files.
+> Always use environment variables. The `.env` file is git-ignored and should
+> only contain placeholder values. Store your real keys in your shell profile.
+
+**Option A — Environment variables (recommended):**
+
+Add to `~/.bashrc` or `~/.zshrc`:
+
 ```bash
-cp .env.example .env
+# MARS — at least one LLM provider required
+export DASHSCOPE_API_KEY="sk-xxxxxxxx"      # Qwen (Alibaba Cloud)
+export DEEPSEEK_API_KEY="sk-xxxxxxxx"       # DeepSeek
+export MOONSHOT_API_KEY="sk-xxxxxxxx"       # Kimi (Moonshot AI)
+export ZHIPU_API_KEY="xxxxxxxx.xxxxxxxx"    # GLM (Zhipu AI)
+export SEMANTIC_SCHOLAR_API_KEY="xxxxxxxx"  # Optional
 ```
 
-Edit `.env` and fill in your API keys:
+Then run `source ~/.bashrc` (or restart your terminal).
+
+**Option B — `.env` file (git-ignored, for local dev):**
+
+```bash
+cp .env.example .env
+# Edit .env and fill in your keys (this file is NOT tracked by git)
+```
 
 ```env
-# Required: at least one LLM provider
+# Fill in at least one provider; leave others blank
 DASHSCOPE_API_KEY=sk-xxxxxxxx       # Qwen (Alibaba Cloud)
-DEEPSEEK_API_KEY=sk-xxxxxxxx        # DeepSeek
-MOONSHOT_API_KEY=sk-xxxxxxxx        # Kimi (Moonshot AI)
-ZHIPU_API_KEY=xxxxxxxx.xxxxxxxx     # GLM (Zhipu AI)
-
-# Optional: increases Semantic Scholar rate limits
-SEMANTIC_SCHOLAR_API_KEY=xxxxxxxx
+DEEPSEEK_API_KEY=                   # DeepSeek (optional)
+MOONSHOT_API_KEY=                   # Kimi (optional)
+ZHIPU_API_KEY=                      # GLM (optional)
 
 # Customize defaults
 DEFAULT_LLM_PROVIDER=qwen           # qwen | deepseek | kimi | glm
 MAX_PAPERS_PER_SEARCH=50
 MAX_PAPERS_FOR_ANALYSIS=20
-
-# Optional: enable CrewAI memory (requires an OpenAI-compatible embedding key)
-ENABLE_MEMORY=false
 ```
 
 ### 3. Run
