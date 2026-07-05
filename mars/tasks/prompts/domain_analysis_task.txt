@@ -1,0 +1,20 @@
+分析以下研究主题，识别研究领域和子领域，并推荐最相关的CCF推荐期刊/会议列表：
+
+研究主题：{topic}
+
+请完成以下工作：
+1. 识别主研究领域和2-4个子领域
+2. 提取3-8个核心关键词（包含英文）
+3. 使用keyword_expander工具扩展关键词
+4. 使用ccf_database_query工具查询相关期刊/会议
+5. 推荐Top-5最相关的期刊/会议，注明CCF等级
+6. 使用file_writer工具将结果保存到domain_analysis.json
+
+输出格式要求：结构化的JSON格式，包含research_domain、sub_domains、keywords、recommended_venues字段。
+---
+expected_output: |
+一个结构化的JSON报告，包含：
+- research_domain: 主研究领域名称
+- sub_domains: 子领域列表
+- keywords: 核心关键词列表（中英文）
+- recommended_venues: 推荐期刊/会议列表，每项包含name、ccf_rank、relevance_reason

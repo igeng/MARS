@@ -16,6 +16,7 @@ from mars.tools.file_manager import FileWriterTool
 from mars.tools.keyword_expander import KeywordExpanderTool
 from mars.tools.semantic_scholar import SemanticScholarSearchTool
 from mars.services.llm_gateway import get_llm_by_task
+from mars.config.settings import settings
 
 
 def create_searcher_agent() -> Agent:
@@ -44,5 +45,5 @@ def create_searcher_agent() -> Agent:
         ],
         verbose=True,
         allow_delegation=False,
-        max_iter=8,
+        max_iter=settings.AGENT_MAX_ITER,
     )

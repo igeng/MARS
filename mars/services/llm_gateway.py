@@ -163,14 +163,13 @@ class RateLimitAwareLLM(LLM):
         self._retry_base_delay = retry_base_delay
         self._retry_max_delay = retry_max_delay
 
-    def call(
-        self,
-        messages: Any,
-        tools: Any = None,
-        callbacks: Any = None,
-        available_functions: Any = None,
-    ) -> Any:
-        """Call the LLM, retrying on rate limits before falling back."""
+    def call(self, *args: Any, **kwargs: Any) -> Any:
+        """Call the LLM, retrying on rate limits before falling back.
+
+        Uses ``*args, **kwargs`` to stay decoupled from the parent class
+        ``call()`` signature so that CrewAI upgrades do not silently break
+        this method.
+        """
         from litellm.exceptions import RateLimitError as _RateLimitError  # lazy import
 
         last_exc: BaseException | None = None
@@ -178,7 +177,7 @@ class RateLimitAwareLLM(LLM):
         # --- Try primary provider with exponential back-off ---
         for attempt in range(self._max_retries):
             try:
-                return super().call(messages, tools, callbacks, available_functions)
+                return super().call(*args, **kwargs)
             except _RateLimitError as exc:
                 last_exc = exc
                 if attempt < self._max_retries - 1:
@@ -206,7 +205,7 @@ class RateLimitAwareLLM(LLM):
                 fallback_llm.model,
             )
             try:
-                return fallback_llm.call(messages, tools, callbacks, available_functions)
+                return fallback_llm.call(*args, **kwargs)
             except _RateLimitError as exc:
                 last_exc = exc
                 logger.warning(

@@ -51,6 +51,9 @@ class MarsSettings(BaseSettings):
     DEFAULT_LLM_PROVIDER: str = "qwen"
     LOG_LEVEL: str = "INFO"
     OUTPUT_DIR: Path = Path("./output")
+    # Maximum tool-call iterations per agent (CrewAI Agent max_iter).
+    # Increase for complex multi-step workflows; decrease to reduce cost.
+    AGENT_MAX_ITER: int = Field(default=10, ge=1)
 
     # ---- GLM rate-limit handling ----
     # Retry attempts on RateLimitError before switching to the next provider.

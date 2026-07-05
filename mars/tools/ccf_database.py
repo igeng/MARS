@@ -1,24 +1,29 @@
 """
 CCF (China Computer Federation) ranking database tool.
 
-Provides a static snapshot of the CCF recommended international academic
-venues list.  In a production deployment this can be backed by a PostgreSQL
-table or an up-to-date YAML/JSON file.
+Provides the CCF recommended international academic venues list.
+Data is loaded from ``mars/data/ccf_<version>.json`` at import time;
+when the file is missing the tool falls back to a built-in static copy.
 """
 
 from __future__ import annotations
 
+import json
+import logging
+from pathlib import Path
 from typing import Any
 
 from crewai.tools import BaseTool
-from pydantic import Field
+
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
-# Static CCF data (A/B/C ranked venues, computer science domains)
-# This is a representative subset – extend as needed.
+# Static CCF data – used ONLY as a fallback when the JSON data file cannot
+# be loaded.  To update the venue list, edit (or add) a versioned file under
+# ``mars/data/ccf_<year>.json`` instead of modifying this list.
 # ---------------------------------------------------------------------------
 
-CCF_DATABASE: list[dict[str, Any]] = [
+_FALLBACK_CCF_DATA: list[dict[str, Any]] = [
     # ---- A-rank conferences ----
     {
         "name": "CVPR",
@@ -33,12 +38,7 @@ CCF_DATABASE: list[dict[str, Any]] = [
         "full_name": "International Conference on Machine Learning",
         "ccf_rank": "A",
         "type": "conference",
-        "domains": [
-            "machine learning",
-            "federated learning",
-            "optimization",
-            "deep learning",
-        ],
+        "domains": ["machine learning", "federated learning", "optimization", "deep learning"],
         "dblp_url": "https://dblp.org/db/conf/icml/",
     },
     {
@@ -46,12 +46,7 @@ CCF_DATABASE: list[dict[str, Any]] = [
         "full_name": "Neural Information Processing Systems",
         "ccf_rank": "A",
         "type": "conference",
-        "domains": [
-            "deep learning",
-            "neural network",
-            "reinforcement learning",
-            "generative model",
-        ],
+        "domains": ["deep learning", "neural network", "reinforcement learning", "generative model"],
         "dblp_url": "https://dblp.org/db/conf/nips/",
     },
     {
@@ -67,11 +62,7 @@ CCF_DATABASE: list[dict[str, Any]] = [
         "full_name": "Annual Meeting of the Association for Computational Linguistics",
         "ccf_rank": "A",
         "type": "conference",
-        "domains": [
-            "natural language processing",
-            "text generation",
-            "machine translation",
-        ],
+        "domains": ["natural language processing", "text generation", "machine translation"],
         "dblp_url": "https://dblp.org/db/conf/acl/",
     },
     {
@@ -79,11 +70,7 @@ CCF_DATABASE: list[dict[str, Any]] = [
         "full_name": "Empirical Methods in Natural Language Processing",
         "ccf_rank": "B",
         "type": "conference",
-        "domains": [
-            "natural language processing",
-            "information extraction",
-            "sentiment analysis",
-        ],
+        "domains": ["natural language processing", "information extraction", "sentiment analysis"],
         "dblp_url": "https://dblp.org/db/conf/emnlp/",
     },
     {
@@ -131,12 +118,7 @@ CCF_DATABASE: list[dict[str, Any]] = [
         "full_name": "USENIX Security Symposium",
         "ccf_rank": "A",
         "type": "conference",
-        "domains": [
-            "security",
-            "privacy",
-            "cryptography",
-            "differential privacy",
-        ],
+        "domains": ["security", "privacy", "cryptography", "differential privacy"],
         "dblp_url": "https://dblp.org/db/conf/uss/",
     },
     {
@@ -153,11 +135,7 @@ CCF_DATABASE: list[dict[str, Any]] = [
         "full_name": "IEEE Transactions on Pattern Analysis and Machine Intelligence",
         "ccf_rank": "A",
         "type": "journal",
-        "domains": [
-            "computer vision",
-            "pattern recognition",
-            "machine learning",
-        ],
+        "domains": ["computer vision", "pattern recognition", "machine learning"],
         "dblp_url": "https://dblp.org/db/journals/pami/",
     },
     {
@@ -173,11 +151,7 @@ CCF_DATABASE: list[dict[str, Any]] = [
         "full_name": "Artificial Intelligence",
         "ccf_rank": "A",
         "type": "journal",
-        "domains": [
-            "artificial intelligence",
-            "machine learning",
-            "knowledge representation",
-        ],
+        "domains": ["artificial intelligence", "machine learning", "knowledge representation"],
         "dblp_url": "https://dblp.org/db/journals/ai/",
     },
     {
@@ -185,11 +159,7 @@ CCF_DATABASE: list[dict[str, Any]] = [
         "full_name": "Journal of Machine Learning Research",
         "ccf_rank": "A",
         "type": "journal",
-        "domains": [
-            "machine learning",
-            "statistical learning",
-            "federated learning",
-        ],
+        "domains": ["machine learning", "statistical learning", "federated learning"],
         "dblp_url": "https://dblp.org/db/journals/jmlr/",
     },
     # ---- More A/B-rank conferences ----
@@ -214,12 +184,7 @@ CCF_DATABASE: list[dict[str, Any]] = [
         "full_name": "AAAI Conference on Artificial Intelligence",
         "ccf_rank": "A",
         "type": "conference",
-        "domains": [
-            "artificial intelligence",
-            "machine learning",
-            "planning",
-            "knowledge representation",
-        ],
+        "domains": ["artificial intelligence", "machine learning", "planning", "knowledge representation"],
         "dblp_url": "https://dblp.org/db/conf/aaai/",
     },
     {
@@ -235,12 +200,7 @@ CCF_DATABASE: list[dict[str, Any]] = [
         "full_name": "The Web Conference",
         "ccf_rank": "A",
         "type": "conference",
-        "domains": [
-            "web mining",
-            "recommendation system",
-            "knowledge graph",
-            "graph neural network",
-        ],
+        "domains": ["web mining", "recommendation system", "knowledge graph", "graph neural network"],
         "dblp_url": "https://dblp.org/db/conf/www/",
     },
     {
@@ -252,6 +212,43 @@ CCF_DATABASE: list[dict[str, Any]] = [
         "dblp_url": "https://dblp.org/db/conf/infocom/",
     },
 ]
+
+
+def _load_ccf_data(version: str = "2025") -> list[dict[str, Any]]:
+    """Load CCF venue data from a versioned JSON file.
+
+    Looks for ``mars/data/ccf_<version>.json`` relative to this file.
+    Returns the built-in ``_FALLBACK_CCF_DATA`` when the file is missing
+    or cannot be parsed.
+    """
+    data_dir = Path(__file__).resolve().parent.parent / "data"
+    json_path = data_dir / f"ccf_{version}.json"
+
+    if not json_path.is_file():
+        logger.info(
+            "CCF data file %s not found – using built-in fallback.", json_path
+        )
+        return _FALLBACK_CCF_DATA
+
+    try:
+        raw = json.loads(json_path.read_text(encoding="utf-8"))
+        venues = raw.get("venues", [])
+        if not venues:
+            logger.warning("CCF data file %s has empty 'venues' – using fallback.", json_path)
+            return _FALLBACK_CCF_DATA
+        logger.info("Loaded %d CCF venues from %s.", len(venues), json_path)
+        return venues
+    except (json.JSONDecodeError, KeyError, OSError) as exc:
+        logger.warning(
+            "Failed to parse CCF data file %s: %s – using built-in fallback.",
+            json_path,
+            exc,
+        )
+        return _FALLBACK_CCF_DATA
+
+
+# Module-level cache: loaded once at import time.
+CCF_DATABASE: list[dict[str, Any]] = _load_ccf_data()
 
 
 class CCFDatabaseQueryTool(BaseTool):

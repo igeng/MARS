@@ -1,0 +1,25 @@
+根据领域分析结果，在多个学术数据库中检索相关论文。
+
+原始研究主题：{topic}
+目标检索数量：{max_papers}篇
+
+请完成以下工作：
+1. 参考领域分析任务的关键词和推荐期刊
+2. 使用dblp_search工具在DBLP中检索（重点检索A/B类会议期刊）
+3. 使用semantic_scholar_search工具补充检索（按引用量过滤）
+4. 使用arxiv_search工具检索最新预印本
+5. 合并去重，按相关性和质量排序
+6. 返回最多{max_papers}篇论文的结构化列表
+7. 使用file_writer工具将检索结果保存到paper_search.json
+
+输出要求：每篇论文包含title、authors、venue、year、citation_count（如有）、url、relevance_reason。
+---
+expected_output: |
+最多{max_papers}篇论文的结构化列表，每篇包含：
+- title: 论文标题
+- authors: 作者列表
+- venue: 发表期刊/会议
+- year: 发表年份
+- citation_count: 引用次数（如可获取）
+- url: 论文链接
+- relevance_reason: 与研究主题的相关性说明

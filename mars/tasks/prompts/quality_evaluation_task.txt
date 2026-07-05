@@ -1,0 +1,32 @@
+基于上一步的深度解析结果，对每篇论文（最多{limit}篇）进行学术质量评估，并生成完整的综合分析报告（Markdown格式）。
+
+【评估维度】
+1. 创新性（novelty）：0-10分 — 研究问题和方法是否新颖突破
+2. 技术深度（technical_depth）：0-10分 — 理论是否严谨，技术细节是否充分
+3. 实验有效性（experimental_validity）：0-10分 — 实验设计是否合理，结果是否可信
+4. 写作质量（writing_quality）：0-10分 — 论文结构是否清晰，表达是否准确
+5. 综合评分（overall）：以上四项加权平均
+
+【每篇论文还需提供】
+- 优势（Strengths）：2-3条主要优点
+- 不足（Weaknesses）：1-2条主要局限
+- 改进建议（Suggestions）：1-2条具体改进方向
+
+【最终输出格式要求】
+直接输出完整的Markdown报告，结构如下：
+1. 报告标题（含分析日期和论文总数）
+2. 概述段落
+3. 评分汇总表格（各论文在novelty、technical_depth、experimental_validity、writing_quality、overall五个维度的评分对比）
+4. 逐篇论文完整分析（每篇包含：元信息+下载链接、背景、挑战、研究问题、动机、贡献、方法解析、实验设置、对比方法、实验维度、实验结果、结论、质量评分、优势、不足、改进建议）
+5. 研究缺口识别与未来方向总结
+
+注意：
+1. 使用file_writer工具将完整报告保存到 analysis_report.md
+2. 同时将完整Markdown内容作为任务结果直接输出（供后续任务使用）
+---
+expected_output: |
+一份完整的Markdown格式综合分析报告，包含：
+- 报告标题和概述（含分析日期、论文总数）
+- 评分汇总表格（novelty, technical_depth, experimental_validity, writing_quality, overall各维度对比）
+- 每篇论文的完整分析（元信息含下载链接、深度分析各要素、质量评分+优势+不足+改进建议）
+- 研究缺口识别与未来方向总结

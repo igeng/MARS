@@ -71,6 +71,7 @@ logs/
 
 # Data
 data/
+!mars/data/
 *.db
 *.pdf
 *.csv

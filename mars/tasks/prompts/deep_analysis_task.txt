@@ -1,0 +1,39 @@
+对以下论文进行全面深入的学术解析（最多{limit}篇）。{papers_block}
+
+研究主题：{topic}
+
+【任务要求】
+对每篇论文，请依次完成：
+1. 使用arxiv_search或semantic_scholar_search检索该论文，获取：
+   - 作者、年份、发表会议/期刊、摘要
+   - 论文下载链接（arxiv URL、DOI或PDF链接）
+2. 如有PDF链接，使用pdf_parser工具提取全文内容
+3. 对每篇论文进行深度分析，提取以下所有要素：
+   - 背景（Background）：该研究的领域背景和历史发展
+   - 挑战（Challenges）：该研究要解决的核心难题
+   - 研究问题（Research Questions）：明确的研究问题和目标
+   - 动机（Motivation）：为何要开展该研究
+   - 贡献（Contributions）：论文的主要创新点（3-5条）
+   - 方法解析（Methodology）：核心技术方案和架构的详细说明
+   - 实验设置（Experimental Setup）：数据集、评估指标、实验环境
+   - 对比方法（Baselines）：与哪些方法进行了比较
+   - 实验维度（Experimental Aspects）：从哪些方面进行了评估
+   - 实验结果（Results）：主要实验数据和发现
+   - 结论（Conclusion）：论文的主要结论和未来工作方向
+
+输出每篇论文的结构化Markdown分析文本，包含上述所有要素，并确保每篇都附有可用的下载链接。
+---
+expected_output: |
+前{limit}篇论文的完整深度分析，以Markdown格式输出，每篇包含：
+- 标题、作者、年份、发表会议/期刊、下载链接
+- 背景（Background）
+- 挑战（Challenges）
+- 研究问题（Research Questions）
+- 动机（Motivation）
+- 主要贡献（Contributions，3-5条）
+- 方法解析（Methodology）
+- 实验设置（Experimental Setup）
+- 对比方法（Baselines）
+- 实验维度（Experimental Aspects）
+- 实验结果（Results）
+- 结论（Conclusion）

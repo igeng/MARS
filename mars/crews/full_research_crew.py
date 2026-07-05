@@ -62,7 +62,7 @@ def create_full_research_crew(topic: str) -> Crew:
         searcher, topic, max_papers, context=[domain_analysis_task]
     )
 
-    # ---- Parallel phase: Analysis + Connection + Evaluation ----
+    # ---- Analysis + Connection + Evaluation (sequential; each depends on prior output) ----
     deep_analysis_task = create_deep_analysis_task(
         analyzer, topic, limit=analysis_limit, context=[bulk_search_task]
     )

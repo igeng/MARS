@@ -1,0 +1,47 @@
+Based on the paper analysis and relationship analysis results, generate a rigorous and comprehensive English academic literature review.
+
+Review Topic: {topic}
+
+[Required Structure]
+1. **Title**: Concise and reflective of the research topic
+2. **Abstract** (~200 words): Summarize the scope, methods, and key findings
+3. **Introduction** (~500 words):
+   - Research background and motivation
+   - Importance and application value of the field
+   - Scope of the review and organization
+4. **Research Overview** (~800 words):
+   - Historical development and key milestones
+   - Major research schools and representative works (cite specific papers)
+   - Recent research trends and advances
+5. **Methods and Techniques** (~1000 words):
+   - Systematic taxonomy of research methodologies
+   - Principles, representative papers, and use cases for each category
+   - Evolution and relationships between approaches
+6. **Comparative Analysis**:
+   - Performance comparison table on major benchmarks
+   - Strengths and limitations of each approach
+7. **Open Problems and Challenges** (~400 words):
+   - Core unsolved problems in the field
+   - Theoretical and practical challenges
+8. **Future Research Directions** (~400 words):
+   - Promising emerging directions
+   - Cross-domain fusion opportunities
+   - Concrete actionable research suggestions
+9. **Conclusion** (~200 words): Summarize key insights
+10. **References**: List all cited papers in citation order, format: [N] Authors. Title. Venue, Year. DOI/URL
+
+[Writing Requirements]
+- Language: English throughout
+- Objective and rigorous; support claims with specific data and results
+- Every claim must cite a specific paper (format: [N])
+- Depth: suitable for domain researchers
+- Minimum 3000 words
+- Use file_writer tool to save the review to review_en.md
+---
+expected_output: |
+A complete English academic literature review (Markdown format) including:
+- Title, abstract, introduction
+- Research overview, methods/techniques, comparative analysis table
+- Open problems, future directions, conclusion
+- Complete reference list (properly formatted with DOI/URL)
+- Minimum 3000 words

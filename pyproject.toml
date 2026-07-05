@@ -23,6 +23,8 @@ dependencies = [
     # Multi-agent framework
     "crewai>=0.80.0",
     "crewai-tools>=0.17.0",
+    # LLM routing – required for Moonshot (Kimi) and Zhipu AI (GLM) providers
+    "litellm>=1.50.0",
     # LangChain integrations
     "langchain-openai>=0.2.0",
     # LLM SDKs
@@ -84,7 +86,15 @@ target-version = ["py310", "py311", "py312"]
 [tool.ruff]
 line-length = 100
 target-version = "py310"
-select = ["E", "F", "W", "I"]
+select = [
+    "E",    # pycodestyle errors
+    "F",    # pyflakes
+    "W",    # pycodestyle warnings
+    "I",    # isort (import ordering)
+    "N",    # pep8-naming
+    "UP",   # pyupgrade (modern syntax)
+    "SIM",  # flake8-simplify
+]
 ignore = ["E501"]
 
 [tool.pytest.ini_options]

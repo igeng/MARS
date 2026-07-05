@@ -1,12 +1,26 @@
 """
-LLM factory - backwards-compatible re-exports from :mod:`mars.services.llm_gateway`.
+LLM factory — **DEPRECATED** backwards-compatibility re-exports.
 
-All new code should prefer importing from ``mars.services.llm_gateway``
-directly.  This module exists so that existing call-sites (agents, tools,
-tests) continue to work without changes.
+.. deprecated:: 0.2.0
+    This module is a thin compatibility shim over
+    :mod:`mars.services.llm_gateway`.  All new code should import from
+    ``mars.services.llm_gateway`` directly.  This module will be removed
+    in version 0.3.0.
 """
 
-from mars.services.llm_gateway import (  # noqa: F401 – re-export
+from __future__ import annotations
+
+import warnings
+
+warnings.warn(
+    "mars.utils.llm_factory is deprecated; "
+    "use mars.services.llm_gateway instead. "
+    "This module will be removed in v0.3.0.",
+    DeprecationWarning,
+    stacklevel=2,
+)
+
+from mars.services.llm_gateway import (  # noqa: F401, E402 – re-export
     get_available_providers,
     get_deepseek_llm,
     get_glm_llm,

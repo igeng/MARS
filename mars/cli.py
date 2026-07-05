@@ -17,7 +17,7 @@ import contextlib
 import datetime
 import sys
 from pathlib import Path
-from typing import IO, Generator, Optional, Tuple
+from typing import IO, Callable, Generator, List, Optional, Tuple
 
 import typer
 from rich.console import Console
@@ -81,6 +81,22 @@ class _TeeWriter:
 
     def fileno(self) -> int:
         return self._primary.fileno()
+
+    def writable(self) -> bool:
+        return getattr(self._primary, "writable", lambda: False)()
+
+    def readable(self) -> bool:
+        return getattr(self._primary, "readable", lambda: False)()
+
+    def seekable(self) -> bool:
+        return getattr(self._primary, "seekable", lambda: False)()
+
+    def close(self) -> None:
+        """Close only the secondary stream; keep the primary alive."""
+        try:
+            self._secondary.close()
+        except Exception:
+            pass
 
     # Forward any attribute lookups not handled above to the primary stream
     def __getattr__(self, name: str):
@@ -161,6 +177,92 @@ def _startup(run_dir: Optional[Path] = None) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Shared workflow runner
+# ---------------------------------------------------------------------------
+
+_OutputFile = Tuple[str, str, str]  # (filename, description, format)
+
+
+def _run_workflow(
+    prefix: str,
+    prompt_text: str,
+    run_label: str,
+    workflow_fn: Callable[[], str | None],
+    *,
+    expected_files: List[_OutputFile] | None = None,
+    success_msg_extra: str = "",
+    save_result_as: str | None = None,
+) -> None:
+    """Generic workflow runner shared by all CLI commands.
+
+    Args:
+        prefix: Run-dir prefix (e.g. ``"search"``, ``"analyze"``).
+        prompt_text: Content for ``prompt.txt``.
+        run_label: Emoji + label shown in the "starting…" line.
+        workflow_fn: Zero-argument callable that executes the workflow and
+            returns an optional result string.  If the callable needs
+            topic / papers / etc. it should close over them.
+        expected_files: Optional list of ``(filename, description, format)``
+            tuples to display before the run.
+        success_msg_extra: Extra text appended after the success line.
+        save_result_as: If provided and *workflow_fn* returns a non-empty
+            string, write it to ``<save_result_as>.md`` inside *run_dir*.
+    """
+    from mars.config import settings
+    from mars.utils.logging_config import set_run_id
+
+    settings.OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    run_dir = _create_run_dir(prefix)
+    _startup(run_dir)
+
+    # Inject the run directory name as the logging run_id so every log line
+    # is tagged with the active run.
+    set_run_id(run_dir.name)
+
+    with _run_context(run_dir) as (con, _log_fh):
+        (run_dir / "prompt.txt").write_text(prompt_text, encoding="utf-8")
+        _print_banner(con)
+        con.print(f"\n[bold green]{run_label}[/bold green]\n")
+        con.print(f"[dim]📁 本次运行输出目录：{run_dir.resolve()}[/dim]\n")
+
+        if expected_files:
+            file_table = Table(
+                title="📋 本次运行预计生成以下文件",
+                show_header=True,
+                header_style="bold cyan",
+            )
+            file_table.add_column("文件名", style="cyan", no_wrap=True)
+            file_table.add_column("内容说明", style="white")
+            file_table.add_column("格式", style="dim")
+            for fname, desc, fmt in expected_files:
+                file_table.add_row(fname, desc, fmt)
+            con.print(file_table)
+            con.print()
+
+        try:
+            result = workflow_fn()
+
+            if success_msg_extra:
+                con.print(f"\n[bold cyan]{success_msg_extra}[/bold cyan]")
+
+            con.print(
+                f"\n[dim]所有输出文件已保存至：{run_dir.resolve()}[/dim]"
+            )
+
+            if save_result_as and result:
+                report_path = run_dir / f"{save_result_as}.md"
+                try:
+                    report_path.write_text(result, encoding="utf-8")
+                    con.print(f"\n[dim]💾 结果已保存至：{report_path.resolve()}[/dim]")
+                except OSError as exc:
+                    con.print(f"[yellow]⚠ 结果保存失败：{exc}[/yellow]")
+
+        except Exception as exc:
+            con.print(f"[bold red]❌ 失败：{exc}[/bold red]")
+            raise typer.Exit(1) from exc
+
+
+# ---------------------------------------------------------------------------
 # Commands
 # ---------------------------------------------------------------------------
 
@@ -174,36 +276,26 @@ def search_command(
     """
     基础检索流程：领域分析 → 论文检索 → 中/英文献综述 → 保存5份输出文件
     """
-    from mars.config import settings
+    _run_workflow(
+        prefix="search",
+        prompt_text=topic,
+        run_label="🔍 开始检索：" + topic,
+        workflow_fn=lambda: _call_search(topic, max_results),
+        expected_files=[
+            ("prompt.txt",       "输入的研究主题",                         "文本"),
+            ("run.log",          "完整运行日志",                           "文本"),
+            ("paper_search.json","检索结果：论文完整元数据",               "JSON"),
+            ("review_zh.md",     "中文学术文献综述",                       "Markdown"),
+            ("review_en.md",     "English literature review",              "Markdown"),
+        ],
+        success_msg_extra="✅ 检索完成",
+    )
 
-    # Create per-run output folder and set it as the active OUTPUT_DIR
-    settings.OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    run_dir = _create_run_dir("search")
-    _startup(run_dir)
 
-    with _run_context(run_dir) as (con, _log_fh):
-        # Save prompt
-        (run_dir / "prompt.txt").write_text(topic, encoding="utf-8")
-
-        _print_banner(con)
-        con.print(f"\n[bold green]🔍 开始检索：[/bold green] {topic}\n")
-        con.print(
-            f"[dim]📁 本次运行输出目录：{run_dir.resolve()}[/dim]\n"
-            f"[dim]预计生成5份文件：prompt.txt、run.log、paper_search.json、"
-            f"review_zh.md、review_en.md[/dim]\n"
-        )
-
-        from mars.crews.search_crew import run_search
-
-        try:
-            run_search(topic, max_results=max_results)
-            con.print(
-                f"\n[bold cyan]✅ 检索完成[/bold cyan]\n"
-                f"[dim]所有输出文件已保存至：{run_dir.resolve()}[/dim]"
-            )
-        except Exception as exc:
-            con.print(f"[bold red]❌ 检索失败：{exc}[/bold red]")
-            raise typer.Exit(1) from exc
+def _call_search(topic: str, max_results: int) -> None:
+    from mars.crews.search_crew import run_search
+    run_search(topic, max_results=max_results)
+    return None
 
 
 @app.command("analyze")
@@ -219,36 +311,24 @@ def analyze_command(
     """
     深度分析流程：论文获取 → 深度解析 → 质量评估 → 返回分析报告
     """
-    from mars.config import settings
+    _run_workflow(
+        prefix="analyze",
+        prompt_text=papers,
+        run_label="🔬 开始深度分析...",
+        workflow_fn=lambda: _call_analyze(papers, max_papers),
+        expected_files=[
+            ("prompt.txt",        "输入的论文信息",      "文本"),
+            ("run.log",           "完整运行日志",        "文本"),
+            ("analysis_report.md","深度分析报告",        "Markdown"),
+        ],
+        success_msg_extra="✅ 分析完成",
+        save_result_as="analysis_report",
+    )
 
-    settings.OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    run_dir = _create_run_dir("analyze")
-    _startup(run_dir)
 
-    with _run_context(run_dir) as (con, _log_fh):
-        (run_dir / "prompt.txt").write_text(papers, encoding="utf-8")
-        _print_banner(con)
-        con.print(f"\n[bold green]🔬 开始深度分析...[/bold green]\n")
-        con.print(
-            f"[dim]📁 本次运行输出目录：{run_dir.resolve()}[/dim]\n"
-            f"[dim]预计生成3份文件：prompt.txt、run.log、analysis_report.md[/dim]\n"
-        )
-
-        from mars.crews.analysis_crew import run_analysis
-
-        try:
-            result = run_analysis(papers, max_papers=max_papers)
-            con.print("\n[bold cyan]📊 分析报告：[/bold cyan]")
-            con.print(result)
-            report_path = run_dir / "analysis_report.md"
-            try:
-                report_path.write_text(result, encoding="utf-8")
-                con.print(f"\n[dim]💾 结果已保存至：{report_path.resolve()}[/dim]")
-            except OSError as exc:
-                con.print(f"[yellow]⚠ 结果保存失败：{exc}[/yellow]")
-        except Exception as exc:
-            con.print(f"[bold red]❌ 分析失败：{exc}[/bold red]")
-            raise typer.Exit(1) from exc
+def _call_analyze(papers: str, max_papers: int) -> str:
+    from mars.crews.analysis_crew import run_analysis
+    return run_analysis(papers, max_papers=max_papers)
 
 
 @app.command("connect")
@@ -263,30 +343,18 @@ def connect_command(
     """
     关联分析流程：引用分析 → 相似度计算 → 中/英综述生成 → 返回关联图谱和综述
     """
-    from mars.config import settings
+    _run_workflow(
+        prefix="connect",
+        prompt_text=f"papers: {papers}\ntopic: {topic}",
+        run_label="🔗 开始关联分析...",
+        workflow_fn=lambda: _call_connect(papers, topic),
+        success_msg_extra="✅ 关联分析完成",
+    )
 
-    settings.OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    run_dir = _create_run_dir("connect")
-    _startup(run_dir)
 
-    with _run_context(run_dir) as (con, _log_fh):
-        (run_dir / "prompt.txt").write_text(
-            f"papers: {papers}\ntopic: {topic}", encoding="utf-8"
-        )
-        _print_banner(con)
-        con.print(f"\n[bold green]🔗 开始关联分析...[/bold green]\n")
-        con.print(f"[dim]📁 本次运行输出目录：{run_dir.resolve()}[/dim]\n")
-
-        from mars.crews.connection_crew import run_connection
-
-        try:
-            result = run_connection(papers, topic=topic)
-            con.print("\n[bold cyan]🗺️  关联分析报告：[/bold cyan]")
-            con.print(result)
-            _save_result(result, "connection_report", con)
-        except Exception as exc:
-            con.print(f"[bold red]❌ 关联分析失败：{exc}[/bold red]")
-            raise typer.Exit(1) from exc
+def _call_connect(papers: str, topic: str) -> str:
+    from mars.crews.connection_crew import run_connection
+    return run_connection(papers, topic=topic)
 
 
 @app.command("full")
@@ -296,32 +364,12 @@ def full_research_command(
     """
     完整研究流程：领域分析 → 批量检索 → 深度解析 + 关联分析 + 质量评估 → 中/英综述生成
     """
-    from mars.config import settings
-
-    settings.OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    run_dir = _create_run_dir("full")
-    _startup(run_dir)
-
-    with _run_context(run_dir) as (con, _log_fh):
-        (run_dir / "prompt.txt").write_text(topic, encoding="utf-8")
-        _print_banner(con)
-        con.print(f"\n[bold green]🚀 启动完整研究流程：[/bold green] {topic}\n")
-        con.print(
-            "[dim]此流程将依次执行：领域分析 → 论文检索 → 深度解析 → "
-            "关联分析 → 质量评估 → 中/英综述生成 → 综合报告生成[/dim]\n"
-        )
-        con.print(f"[dim]📁 本次运行输出目录：{run_dir.resolve()}[/dim]\n")
-
-        # Print expected output file list
-        file_table = Table(
-            title="📋 本次运行预计生成以下 10 份文件",
-            show_header=True,
-            header_style="bold cyan",
-        )
-        file_table.add_column("文件名", style="cyan", no_wrap=True)
-        file_table.add_column("内容说明", style="white")
-        file_table.add_column("格式", style="dim")
-        _expected_files = [
+    _run_workflow(
+        prefix="full",
+        prompt_text=topic,
+        run_label="🚀 启动完整研究流程：" + topic,
+        workflow_fn=lambda: _call_full(topic),
+        expected_files=[
             ("prompt.txt",                   "输入的研究主题",                                  "文本"),
             ("run.log",                      "完整运行日志",                                    "文本"),
             ("domain_analysis.json",         "领域分析：子领域 / 关键词 / 推荐期刊会议",        "JSON"),
@@ -332,25 +380,15 @@ def full_research_command(
             ("review_en.md",                 "英文学术文献综述（3000+字）",                     "Markdown"),
             ("review_zh.md",                 "中文学术文献综述（英文版完整翻译）",              "Markdown"),
             ("full_research_report.md",      "综合研究报告：统计 + 质量排名 + 洞见 + 导读指南", "Markdown"),
-        ]
-        for fname, desc, fmt in _expected_files:
-            file_table.add_row(fname, desc, fmt)
-        con.print(file_table)
-        con.print()
+        ],
+        success_msg_extra="✅ 完整研究流程已完成",
+    )
 
-        from mars.crews.full_research_crew import run_full_research
 
-        try:
-            # run_full_research returns the synthesis task's string output, but
-            # all 10 output files are already saved by agents via file_writer.
-            run_full_research(topic)
-            con.print(
-                f"\n[bold cyan]✅ 完整研究流程已完成[/bold cyan]\n"
-                f"[dim]所有 10 份输出文件已保存至：{run_dir.resolve()}[/dim]"
-            )
-        except Exception as exc:
-            con.print(f"[bold red]❌ 研究流程失败：{exc}[/bold red]")
-            raise typer.Exit(1) from exc
+def _call_full(topic: str) -> None:
+    from mars.crews.full_research_crew import run_full_research
+    run_full_research(topic)
+    return None
 
 
 @app.command("api")

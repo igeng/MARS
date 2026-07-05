@@ -117,7 +117,7 @@ Multiple papers → Connector (citation network) → Summarizer
 User topic
   → Researcher (domain analysis)
   → Searcher (50 papers)
-  → Analyzer (top 20) + Connector (all 50) + Evaluator (top 20)
+  → Analyzer (top 20) → Connector (all 50) → Evaluator (top 20)
   → Summarizer (English review ≥ 3000 words → Chinese translation)
   → Summarizer (full synthesis report)
   → Output: 8+ files including bilingual comprehensive review + synthesis report

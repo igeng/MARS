@@ -13,6 +13,7 @@ from crewai import Agent
 from mars.tools.ccf_database import CCFDatabaseQueryTool
 from mars.tools.keyword_expander import KeywordExpanderTool
 from mars.services.llm_gateway import get_llm_by_task
+from mars.config.settings import settings
 
 
 def create_researcher_agent() -> Agent:
@@ -36,5 +37,5 @@ def create_researcher_agent() -> Agent:
         ],
         verbose=True,
         allow_delegation=False,
-        max_iter=5,
+        max_iter=settings.AGENT_MAX_ITER,
     )
