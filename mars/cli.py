@@ -177,6 +177,82 @@ def _startup(run_dir: Optional[Path] = None) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Post-generation evaluation
+# ---------------------------------------------------------------------------
+
+def _run_evaluation_after_generation(con: Console, run_dir: Path, topic: str) -> None:
+    """Run full evaluation on the generated survey and print results."""
+    review_path = run_dir / "review_en.md"
+    if not review_path.is_file():
+        con.print("[yellow]⚠ review_en.md 不存在，跳过评估。[/yellow]")
+        return
+
+    con.print(f"\n[bold yellow]━━━ 全维度评估 ━━━[/bold yellow]")
+
+    try:
+        from mars.evaluation.full_eval import run_full_evaluation, save_eval_report
+
+        eval_results = run_full_evaluation(
+            topic=topic,
+            survey_path=review_path,
+        )
+        save_eval_report(eval_results, run_dir)
+        _print_eval_summary(con, eval_results)
+    except Exception as exc:
+        con.print(f"[red]❌ 评估失败：{exc}[/red]")
+
+
+def _print_eval_summary(con: Console, results: dict) -> None:
+    """Print a compact evaluation summary."""
+    m = results.get("metrics", {})
+
+    # Citation F1
+    cit = m.get("citation", {})
+    if cit and "f1" in cit:
+        con.print(f"\n[bold]📊 Citation Metrics[/bold]")
+        con.print(f"  Recall: {cit['recall']:.2%}  Precision: {cit['precision']:.2%}  F1: {cit['f1']:.2%}")
+        con.print(f"  Refs: {cit['matched_refs']}/{cit['ground_truth_refs']} matched")
+
+    # LLM Judge
+    judge = m.get("llm_judge_12dim", {})
+    if isinstance(judge, dict) and "overall_score" in judge:
+        con.print(f"\n[bold]🎓 LLM-as-Judge (12-dim)[/bold]")
+        con.print(f"  Overall: {judge['overall_score']}/10")
+        for cat in ["core_quality", "writing_quality", "content_depth"]:
+            cdata = judge.get(cat, {})
+            if "category_score" in cdata:
+                con.print(f"  {cat}: {cdata['category_score']}/10")
+
+    # Hallucination
+    hallu = m.get("hallucination", {})
+    if isinstance(hallu, dict) and "total_citations" in hallu:
+        con.print(f"\n[bold]🔍 Hallucination[/bold]")
+        con.print(f"  Total: {hallu['total_citations']}  Verified: {hallu.get('verified',0)}  Fabrication: {hallu.get('fabrication_rate',0):.1%}")
+
+    # SurGE official
+    surge = m.get("surge_official", {})
+    if isinstance(surge, dict) and surge:
+        con.print(f"\n[bold]📐 SurGE Official[/bold]")
+        for k, v in surge.items():
+            if isinstance(v, dict):
+                for sub_k, sub_v in v.items():
+                    if isinstance(sub_v, (int, float)):
+                        con.print(f"  {k}.{sub_k}: {sub_v:.4f}")
+
+    # Baseline comparison
+    baselines = results.get("baselines", {})
+    if baselines and not baselines.get("error"):
+        con.print(f"\n[bold]⚔️ Baseline Comparison[/bold]")
+        con.print(f"  {'Method':<15} {'F1':>8} {'Recall':>8} {'Precision':>8}")
+        for name in ["Naive", "ID", "Autosurvey"]:
+            if name in baselines:
+                b = baselines[name]
+                con.print(f"  {name:<15} {b['avg_f1']:>7.4f} {b['avg_recall']:>7.4f} {b['avg_precision']:>7.4f}")
+
+    con.print(f"\n[dim]📄 完整报告: {results.get('survey_path', 'N/A').replace('review_en.md', 'full_eval_report.json')}[/dim]")
+
+
+# ---------------------------------------------------------------------------
 # Shared workflow runner
 # ---------------------------------------------------------------------------
 
@@ -192,6 +268,7 @@ def _run_workflow(
     expected_files: List[_OutputFile] | None = None,
     success_msg_extra: str = "",
     save_result_as: str | None = None,
+    eval_after: bool = False,
 ) -> None:
     """Generic workflow runner shared by all CLI commands.
 
@@ -260,6 +337,10 @@ def _run_workflow(
         except Exception as exc:
             con.print(f"[bold red]❌ 失败：{exc}[/bold red]")
             raise typer.Exit(1) from exc
+
+        # Post-generation evaluation (if --eval flag)
+        if eval_after:
+            _run_evaluation_after_generation(con, run_dir, prompt_text)
 
 
 # ---------------------------------------------------------------------------
@@ -363,6 +444,9 @@ def full_research_command(
     mode: str = typer.Option(
         "online", "--mode", "-m", help="检索模式: online (实时API) | surge (SurGE语料库)"
     ),
+    eval_flag: bool = typer.Option(
+        False, "--eval", help="生成后自动运行全维度评估（含 SurGE 指标 + baseline 对比）"
+    ),
 ) -> None:
     """
     完整研究流程：领域分析 → 批量检索 → 深度解析 + 关联分析 + 质量评估 → 中/英综述生成
@@ -372,6 +456,7 @@ def full_research_command(
         prompt_text=topic,
         run_label=f"🚀 启动完整研究流程（{mode}模式）：" + topic,
         workflow_fn=lambda: _call_full(topic, mode),
+        eval_after=eval_flag,
         expected_files=[
             ("prompt.txt",                   "输入的研究主题",                                  "文本"),
             ("run.log",                      "完整运行日志",                                    "文本"),
