@@ -1,16 +1,23 @@
-根据领域分析结果，在多个学术数据库中检索相关论文。
+根据领域分析结果，进行两阶段高质量论文检索。
 
 原始研究主题：{topic}
-目标检索数量：{max_papers}篇
+初筛池大小：{pool_size}篇 → 最终精选：{max_papers}篇
 
-请完成以下工作：
+【第一阶段：广撒网】
 1. 参考领域分析任务的关键词和推荐期刊
-2. 使用dblp_search工具在DBLP中检索（重点检索A/B类会议期刊）
-3. 使用semantic_scholar_search工具补充检索（按引用量过滤）
-4. 使用arxiv_search工具检索最新预印本
-5. 合并去重，按相关性和质量排序
-6. 返回最多{max_papers}篇论文的结构化列表
-7. 使用file_writer工具将检索结果保存到paper_search.json
+2. 使用多个检索工具广泛检索，获取尽可能多的候选论文（目标 {pool_size} 篇）
+3. 使用不同的关键词组合和变体进行多轮检索
+4. 合并所有检索结果，按 doc_id 去重
+
+【第二阶段：精选排序】
+5. 基于以下标准对 {pool_size} 篇候选论文进行质量排序：
+   - 与研究主题的直接相关性
+   - 发表期刊/会议的 CCF 等级
+   - 引用量（高引用优先）
+   - 时效性（近 3 年优先）
+   - 方法多样性和覆盖面
+6. 选出最优质的 {max_papers} 篇论文
+7. 使用file_writer工具将精选结果保存到paper_search.json
 
 输出要求：每篇论文包含title、authors、venue、year、citation_count（如有）、url、relevance_reason。
 如搜索结果包含 doc_id 字段，务必保留（用于精确评估）。

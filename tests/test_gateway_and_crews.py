@@ -270,6 +270,7 @@ class TestPromptTemplates:
         from mars.tasks.task_definitions import _load_prompt
 
         desc, _ = _load_prompt("paper_search_task")
-        formatted = desc.format(topic="federated learning", max_papers=42)
+        formatted = desc.format(topic="federated learning", max_papers=42, pool_size=200)
         assert "federated learning" in formatted
         assert "42" in formatted
+        assert "200" in formatted

@@ -185,14 +185,27 @@ class SurgeCorpusSearchTool(BaseTool):
         if n_papers == 0:
             return json.dumps({"error": "corpus is empty", "count": 0})
 
-        # Transform query and compute cosine similarity
+        # Stage 1: TF-IDF broad retrieval
         query_vec = _vectorizer.transform([query])
         from sklearn.metrics.pairwise import cosine_similarity
         scores = cosine_similarity(query_vec, _tfidf_matrix).flatten()
 
-        # Top-K
-        top_k = min(max_results, n_papers)
-        top_indices = np.argsort(scores)[::-1][:top_k]
+        # Get a wider pool for reranking
+        pool_size = min(max(100, max_results * 5), n_papers)
+        pool_indices = np.argsort(scores)[::-1][:pool_size]
+
+        # Stage 2: Embedding-based reranking (if embedder available)
+        embed_fn = _get_semantic_embedder()
+        if embed_fn is not None and pool_size > max_results:
+            try:
+                top_indices = _rerank_by_embedding(
+                    query, pool_indices, embed_fn, max_results,
+                )
+            except Exception as exc:
+                logger.debug("Embedding rerank failed: %s — falling back to TF-IDF", exc)
+                top_indices = pool_indices[:max_results]
+        else:
+            top_indices = pool_indices[:max_results]
 
         results: List[Dict[str, Any]] = []
         for idx in top_indices:
@@ -216,6 +229,60 @@ class SurgeCorpusSearchTool(BaseTool):
             "count": len(results),
             "results": results,
         }, ensure_ascii=False)
+
+
+# ---------------------------------------------------------------------------
+# Semantic embedding reranker (lightweight, on-demand)
+# ---------------------------------------------------------------------------
+
+_semantic_model = None
+
+
+def _get_semantic_embedder():
+    """Return a sentence-transformers model for reranking, or None."""
+    global _semantic_model
+    if _semantic_model is not None:
+        return _semantic_model
+    try:
+        from sentence_transformers import SentenceTransformer
+        _semantic_model = SentenceTransformer("all-MiniLM-L6-v2")
+        logger.info("Semantic reranker loaded: all-MiniLM-L6-v2")
+        return _semantic_model
+    except ImportError:
+        logger.debug("sentence-transformers not available — using TF-IDF only")
+        return None
+    except Exception as exc:
+        logger.debug("Failed to load embedding model: %s", exc)
+        return None
+
+
+def _rerank_by_embedding(
+    query: str,
+    pool_indices: np.ndarray,
+    embed_fn,
+    top_k: int,
+) -> np.ndarray:
+    """Rerank pool candidates by embedding cosine similarity to query."""
+    # Build candidate texts: title + first 300 chars of abstract
+    candidates: list[str] = []
+    for idx in pool_indices:
+        paper = _corpus_meta[idx]
+        title = paper.get("Title", paper.get("title", ""))
+        abstract = (paper.get("Abstract", paper.get("abstract", "")) or "")[:300]
+        candidates.append(f"{title}. {abstract}")
+
+    # Embed query and candidates
+    query_emb = np.array(embed_fn.encode([query], show_progress_bar=False)[0])
+    candidate_embs = np.array(embed_fn.encode(candidates, show_progress_bar=False))
+
+    # Cosine similarity
+    query_norm = query_emb / (np.linalg.norm(query_emb) + 1e-8)
+    candidate_norms = candidate_embs / (np.linalg.norm(candidate_embs, axis=1, keepdims=True) + 1e-8)
+    sims = np.dot(candidate_norms, query_norm)
+
+    # Re-rank and return top-k original indices
+    reranked = np.argsort(sims)[::-1][:top_k]
+    return pool_indices[reranked]
 
 
 # ---------------------------------------------------------------------------

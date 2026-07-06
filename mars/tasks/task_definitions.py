@@ -78,12 +78,15 @@ def create_paper_search_task(
     topic: str,
     max_papers: int = 50,
     *,
+    pool_size: int | None = None,
     context: list[Task] | None = None,
 ) -> Task:
     """Task: search academic databases for papers on a topic."""
+    from mars.config import settings
+    pool = pool_size or settings.SEARCH_POOL_SIZE
     desc, exp = _load_prompt("paper_search_task")
     return Task(
-        description=desc.format(topic=topic, max_papers=max_papers),
+        description=desc.format(topic=topic, max_papers=max_papers, pool_size=pool),
         expected_output=exp.format(max_papers=max_papers),
         agent=agent,
         context=context or [],

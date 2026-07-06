@@ -43,6 +43,9 @@ class MarsSettings(BaseSettings):
     SEMANTIC_SCHOLAR_API_KEY: str = ""
     MAX_PAPERS_PER_SEARCH: int = Field(default=50, gt=0)
     MAX_PAPERS_FOR_ANALYSIS: int = Field(default=20, gt=0)
+    # Number of papers to retrieve in the initial wide search (before reranking).
+    # Increase to improve ground-truth coverage; LLM reranks down to MAX_PAPERS_PER_SEARCH.
+    SEARCH_POOL_SIZE: int = Field(default=200, gt=0)
     # HTTP read timeout (seconds) for arXiv API requests.
     # Increase if you experience frequent timeout errors on slow networks.
     ARXIV_SEARCH_TIMEOUT: int = Field(default=30, gt=0)
