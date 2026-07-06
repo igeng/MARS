@@ -11,6 +11,7 @@ from __future__ import annotations
 from crewai import Agent
 
 from mars.tools.file_manager import FileWriterTool
+from mars.tools.vectordb_tool import SearchPapersTool, IndexPapersTool
 from mars.services.llm_gateway import get_llm_by_task
 from mars.config.settings import settings
 
@@ -29,9 +30,13 @@ def create_summarizer_agent() -> Agent:
             "你能准确把握领域的研究现状，提炼关键发现，"
             "并指出未来的研究方向。你的综述报告逻辑清晰、"
             "结构完整，能够帮助读者快速掌握一个研究领域的全貌。"
+            "写作时你会先通过 search_papers 检索相关论文内容，"
+            "确保每段内容都有真实的论文支撑，而非仅凭记忆。"
         ),
         llm=get_llm_by_task("summarizer"),
         tools=[
+            IndexPapersTool(),
+            SearchPapersTool(),
             FileWriterTool(),
         ],
         verbose=True,

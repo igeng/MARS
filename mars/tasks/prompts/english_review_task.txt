@@ -30,10 +30,21 @@ Review Topic: {topic}
 9. **Conclusion** (~200 words): Summarize key insights
 10. **References**: List all cited papers in citation order, format: [N] Authors. Title. Venue, Year. DOI/URL
 
+[RAG Workflow (MANDATORY)]
+Before writing each section, you MUST follow this retrieval-augmented workflow:
+1. Use **search_papers** tool with a section-specific query (e.g., "graph neural
+   network architecture comparison" for the Methods section)
+2. Read the retrieved paper chunks carefully — these are the ACTUAL paper
+   contents from the indexed database.
+3. Write the section grounded in these retrieved chunks. Cite papers as [N]
+   matching the paper index from the search results.
+4. NEVER fabricate claims or data — only write what is supported by the
+   retrieved content. If search returns nothing relevant, acknowledge the gap.
+
 [Writing Requirements]
 - Language: English throughout
 - Objective and rigorous; support claims with specific data and results
-- Every claim must cite a specific paper (format: [N])
+- Every claim must cite a specific paper (format: [N]) from search_papers results
 - Depth: suitable for domain researchers
 - Minimum 3000 words
 - Use file_writer tool to save the review to review_en.md

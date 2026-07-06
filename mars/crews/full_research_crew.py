@@ -1,21 +1,12 @@
 """
-Full Research Crew - 完整研究流程（含迭代精炼）
+Full Research Crew - 完整研究流程（含 RAG + 迭代精炼）
 
-Flow:
-  User topic
-    → Researcher Agent (domain analysis)
-    → Searcher Agent (bulk retrieval, 50 papers, saves paper_search.json)
-    → Analyzer Agent (deep analysis, top 20 papers)
-    → Connector Agent (relationship analysis + saves connection_analysis.json
-                        + connection_analysis_report.md)
-    → Evaluator Agent (quality evaluation, saves analysis_report.md)
-    → Summarizer Agent (English review → saves review_en.md)
-    —— Iterative Refinement Loop (EXP-1.1) ——
-    → LLM-as-Judge evaluates review
-    → if score < threshold: revision task → re-evaluate (max N rounds)
-    ——
-    → Summarizer Agent (Chinese translation → saves review_zh.md)
-    → Summarizer Agent (final synthesis → saves full_research_report.md)
+5-Phase Flow:
+  Phase 1: Analysis (domain → search → deep → connect → evaluate)
+  Phase 2: RAG Indexing (paper_search.json → ChromaDB vector store)
+  Phase 3: First-pass English Review (Summarizer with search_papers RAG)
+  Phase 4: Iterative Refinement (LLM-as-Judge → revise → re-evaluate)
+  Phase 5: Chinese Translation + Final Synthesis Report
 """
 
 from __future__ import annotations
@@ -87,6 +78,51 @@ def _build_analysis_crew(topic: str) -> Crew:
         verbose=True,
         memory=settings.ENABLE_MEMORY,
     )
+
+
+# ---------------------------------------------------------------------------
+# RAG indexing (EXP-1.2)
+# ---------------------------------------------------------------------------
+
+def _index_papers_for_rag() -> int:
+    """Index all papers from paper_search.json into ChromaDB for RAG.
+
+    Returns the number of papers indexed.
+    """
+    search_path = settings.OUTPUT_DIR / "paper_search.json"
+    if not search_path.is_file():
+        logger.warning("paper_search.json not found — RAG indexing skipped.")
+        return 0
+
+    try:
+        papers_data = json.loads(search_path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError) as exc:
+        logger.warning("Failed to read paper_search.json: %s", exc)
+        return 0
+
+    # Handle both list and dict formats
+    if isinstance(papers_data, dict):
+        papers = list(papers_data.values())
+    elif isinstance(papers_data, list):
+        papers = papers_data
+    else:
+        logger.warning("Unexpected paper_search.json format: %s", type(papers_data))
+        return 0
+
+    if not papers:
+        logger.warning("paper_search.json is empty — RAG indexing skipped.")
+        return 0
+
+    # Index into ChromaDB
+    try:
+        from mars.tools.vectordb_tool import IndexPapersTool
+        tool = IndexPapersTool()
+        result = tool._run(json.dumps(papers))
+        logger.info("RAG indexing result: %s", result)
+        return len(papers)
+    except Exception as exc:
+        logger.error("RAG indexing failed: %s", exc)
+        return 0
 
 
 # ---------------------------------------------------------------------------
@@ -348,8 +384,13 @@ def run_full_research(topic: str) -> str:
     analysis_crew = _build_analysis_crew(topic)
     analysis_crew.kickoff()
 
-    # ---- Phase 2: First-pass English review ----
-    logger.info("Phase 2: Generating initial English review...")
+    # ---- Phase 2: Index papers for RAG ----
+    logger.info("Phase 2: Indexing papers into vector store for RAG...")
+    indexed = _index_papers_for_rag()
+    logger.info("Indexed %d papers for RAG-enhanced generation.", indexed)
+
+    # ---- Phase 3: First-pass English review ----
+    logger.info("Phase 3: Generating initial English review...")
     summarizer = create_summarizer_agent()
     english_task = create_english_review_task(summarizer, topic)
 
@@ -364,8 +405,8 @@ def run_full_research(topic: str) -> str:
     initial_draft = _read_generated_file("review_en.md") or ""
     logger.info("Initial draft: %d chars", len(initial_draft))
 
-    # ---- Phase 3: Iterative refinement (EXP-1.1) ----
-    logger.info("Phase 3: Iterative refinement loop...")
+    # ---- Phase 4: Iterative refinement (EXP-1.1) ----
+    logger.info("Phase 4: Iterative refinement loop...")
     refined_draft = _run_refinement_loop(topic, initial_draft)
 
     # If the refinement produced a better draft, write it as the final version
@@ -375,8 +416,8 @@ def run_full_research(topic: str) -> str:
         logger.info("Refined draft saved (%d chars → %d chars).",
                      len(initial_draft), len(refined_draft))
 
-    # ---- Phase 4: Chinese translation + synthesis ----
-    logger.info("Phase 4: Chinese translation + synthesis report...")
+    # ---- Phase 5: Chinese translation + synthesis ----
+    logger.info("Phase 5: Chinese translation + synthesis report...")
     chinese_task = create_review_generation_task(summarizer, topic)
     synthesis_task = create_full_research_synthesis_task(summarizer, topic)
 
