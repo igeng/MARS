@@ -424,6 +424,103 @@ def init_db_command() -> None:
     console.print("[bold cyan]✅ 数据库初始化完成[/bold cyan]")
 
 
+@app.command("evaluate")
+def evaluate_command(
+    topic: str = typer.Argument(..., help="研究主题"),
+    survey_path: str = typer.Option(
+        ..., "--survey", "-s", help="待评估的综述文件路径（Markdown）"
+    ),
+    topic_id: str = typer.Option(
+        "", "--topic-id", "-t", help="SurGE topic ID（不指定则自动匹配）"
+    ),
+) -> None:
+    """
+    评估已生成的文献综述质量：SurGE benchmark + LLM-as-Judge + 幻觉检测
+    """
+    from mars.config import settings
+    from mars.evaluation.surge_eval import SurGEEvaluator
+    from mars.evaluation.llm_judge import LLMJudge
+    from mars.evaluation.hallucination_checker import HallucinationChecker
+
+    survey_path_obj = Path(survey_path)
+    if not survey_path_obj.is_file():
+        console.print(f"[red]❌ 文件不存在：{survey_path}[/red]")
+        raise typer.Exit(1)
+
+    survey_text = survey_path_obj.read_text(encoding="utf-8")
+
+    _print_banner(console)
+    console.print(f"\n[bold green]📊 评估综述质量：[/bold green] {topic}\n")
+
+    # 1. SurGE benchmark
+    console.print("[bold]1/3 SurGE Benchmark 评估...[/bold]")
+    evaluator = SurGEEvaluator()
+    if not topic_id:
+        # Auto-match: find topic id that best matches the topic string
+        for tid, tname in evaluator.topics.items():
+            if topic.lower() in tname.lower() or tname.lower() in topic.lower():
+                topic_id = tid
+                break
+    if not topic_id:
+        topic_id = list(evaluator.topic_ids)[0]
+        console.print(f"[yellow]⚠ 未匹配到 topic，使用默认: {topic_id}[/yellow]")
+
+    try:
+        surge_result = evaluator.evaluate(topic_id, survey_text)
+        console.print(f"   Recall:    {surge_result.recall:.2%}")
+        console.print(f"   Precision: {surge_result.precision:.2%}")
+        console.print(f"   F1:        {surge_result.f1:.2%}")
+        console.print(f"   Matched:   {surge_result.matched_ref_count}/{surge_result.ground_truth_ref_count}")
+    except KeyError as exc:
+        console.print(f"[yellow]⚠ SurGE 评估跳过：{exc}[/yellow]")
+        surge_result = None
+
+    # 2. LLM-as-Judge
+    console.print("\n[bold]2/3 LLM-as-Judge 评分...[/bold]")
+    try:
+        judge = LLMJudge()
+        judge_result = judge.evaluate(survey_text, topic)
+        console.print(f"   Citation Coverage:          {judge_result.citation_coverage}/10")
+        console.print(f"   Citation Accuracy:           {judge_result.citation_accuracy}/10")
+        console.print(f"   Content Comprehensiveness:   {judge_result.content_comprehensiveness}/10")
+        console.print(f"   Structural Coherence:        {judge_result.structural_coherence}/10")
+        console.print(f"   Critical Analysis Depth:     {judge_result.critical_analysis_depth}/10")
+        console.print(f"   Writing Quality:             {judge_result.writing_quality}/10")
+        console.print(f"   [bold]Overall: {judge_result.overall_score}/10[/bold]")
+        console.print(f"   {judge_result.overall_comment}")
+    except Exception as exc:
+        console.print(f"[yellow]⚠ LLM Judge 评估跳过：{exc}[/yellow]")
+        judge_result = None
+
+    # 3. Hallucination check
+    console.print("\n[bold]3/3 引用幻觉检测...[/bold]")
+    try:
+        checker = HallucinationChecker()
+        hallu_report = checker.check(survey_text, [])
+        console.print(f"   Total citations:   {hallu_report.total_citations}")
+        console.print(f"   Verified:           {hallu_report.verified}")
+        console.print(f"   Fabricated:         {hallu_report.fabricated}")
+        console.print(f"   Unchecked:          {hallu_report.unchecked}")
+        console.print(f"   [bold]Fabrication rate: {hallu_report.to_dict()['fabrication_rate']:.2%}[/bold]")
+    except Exception as exc:
+        console.print(f"[yellow]⚠ 幻觉检测跳过：{exc}[/yellow]")
+        hallu_report = None
+
+    # Save report
+    report = {
+        "topic": topic,
+        "topic_id": topic_id,
+        "surge": surge_result.to_dict() if surge_result else None,
+        "llm_judge": judge_result.to_dict() if judge_result else None,
+        "hallucination": hallu_report.to_dict() if hallu_report else None,
+    }
+    import json
+    report_path = settings.OUTPUT_DIR / f"evaluation_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+    report_path.parent.mkdir(parents=True, exist_ok=True)
+    report_path.write_text(json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8")
+    console.print(f"\n[dim]💾 评估报告已保存至：{report_path.resolve()}[/dim]")
+
+
 @app.command("check")
 def check_command() -> None:
     """
