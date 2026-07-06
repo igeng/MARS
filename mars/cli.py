@@ -694,6 +694,31 @@ def schedule_serve(
     sched.serve(check_interval=check_interval)
 
 
+@app.command("latex")
+def latex_command(
+    input_path: str = typer.Argument(..., help="输入的 Markdown 综述文件路径"),
+    output_path: str = typer.Option("", "--output", "-o", help="输出 LaTeX 文件路径"),
+    title: str = typer.Option("Automated Literature Review", "--title", help="文档标题"),
+    author: str = typer.Option("MARS", "--author", help="作者"),
+) -> None:
+    """
+    将 Markdown 综述转换为 LaTeX 学术论文格式
+    """
+    from mars.utils.latex_converter import md_to_latex
+
+    input_file = Path(input_path)
+    if not input_file.is_file():
+        console.print(f"[red]❌ 文件不存在：{input_path}[/red]")
+        raise typer.Exit(1)
+
+    md_text = input_file.read_text(encoding="utf-8")
+    latex = md_to_latex(md_text, title=title, author=author)
+
+    out = Path(output_path) if output_path else input_file.with_suffix(".tex")
+    out.write_text(latex, encoding="utf-8")
+    console.print(f"[green]✅ LaTeX 已生成：{out.resolve()}[/green]")
+
+
 @app.command("check")
 def check_command() -> None:
     """

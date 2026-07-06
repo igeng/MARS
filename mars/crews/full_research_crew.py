@@ -505,6 +505,9 @@ def run_full_research(topic: str, corpus_mode: str | None = None) -> str:
     5. Refinement loop (LLM-as-Judge → revision → re-evaluate)
     6. Chinese translation + final synthesis
     """
+    from mars.utils.cost_tracker import CostTracker
+
+    tracker = CostTracker.start(run_id=f"full_{topic[:30].replace(' ', '_')}")
     logger.info("=== MARS Full Research: %s ===", topic)
     logger.info(
         "Refinement: max_rounds=%d, threshold=%.1f",
@@ -568,4 +571,6 @@ def run_full_research(topic: str, corpus_mode: str | None = None) -> str:
     result = final_crew.kickoff()
 
     logger.info("=== MARS Full Research complete ===")
+    tracker.save(settings.OUTPUT_DIR)
+    tracker.stop()
     return str(result)
