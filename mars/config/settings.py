@@ -51,6 +51,8 @@ class MarsSettings(BaseSettings):
     DEFAULT_LLM_PROVIDER: str = "qwen"
     LOG_LEVEL: str = "INFO"
     OUTPUT_DIR: Path = Path("./output")
+    # Retrieval mode: "online" (DBLP/S2/arXiv APIs) or "surge" (SurGE corpus)
+    CORPUS_MODE: str = "online"
     # Maximum tool-call iterations per agent (CrewAI Agent max_iter).
     # Increase for complex multi-step workflows; decrease to reduce cost.
     AGENT_MAX_ITER: int = Field(default=10, ge=1)

@@ -42,13 +42,14 @@ from mars.tasks.task_definitions import (
 logger = logging.getLogger(__name__)
 
 
-def _build_analysis_crew(topic: str) -> Crew:
+def _build_analysis_crew(topic: str, corpus_mode: str | None = None) -> Crew:
     """Build the analysis-phase crew (domain → search → deep → connect → evaluate)."""
     max_papers = settings.MAX_PAPERS_PER_SEARCH
     analysis_limit = settings.MAX_PAPERS_FOR_ANALYSIS
 
+    mode = corpus_mode or settings.CORPUS_MODE
     researcher = create_researcher_agent()
-    searcher = create_searcher_agent()
+    searcher = create_searcher_agent(corpus_mode=mode)
     analyzer = create_analyzer_agent()
     connector = create_connector_agent()
     evaluator = create_evaluator_agent()
@@ -471,13 +472,20 @@ def create_full_research_crew(topic: str) -> Crew:
     )
 
 
-def run_full_research(topic: str) -> str:
+def run_full_research(topic: str, corpus_mode: str | None = None) -> str:
     """Run the full research workflow with iterative refinement.
 
+    Args:
+        topic: Research topic string.
+        corpus_mode: "online" (live APIs) or "surge" (SurGE corpus).
+            Defaults to ``settings.CORPUS_MODE``.
+
     1. Analysis phase (domain → search → deep → connect → evaluate)
-    2. First-pass English review
-    3. Refinement loop (LLM-as-Judge → revision → re-evaluate)
-    4. Chinese translation + final synthesis
+    2. RAG indexing
+    3. Outline generation + validation
+    4. First-pass English review
+    5. Refinement loop (LLM-as-Judge → revision → re-evaluate)
+    6. Chinese translation + final synthesis
     """
     logger.info("=== MARS Full Research: %s ===", topic)
     logger.info(
@@ -487,8 +495,8 @@ def run_full_research(topic: str) -> str:
     )
 
     # ---- Phase 1: Analysis ----
-    logger.info("Phase 1: Running analysis crew...")
-    analysis_crew = _build_analysis_crew(topic)
+    logger.info("Phase 1: Running analysis crew (mode=%s)...", corpus_mode or settings.CORPUS_MODE)
+    analysis_crew = _build_analysis_crew(topic, corpus_mode=corpus_mode)
     analysis_crew.kickoff()
 
     # ---- Phase 2: Index papers for RAG ----

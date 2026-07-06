@@ -360,6 +360,9 @@ def _call_connect(papers: str, topic: str) -> str:
 @app.command("full")
 def full_research_command(
     topic: str = typer.Argument(..., help="研究主题（中文或英文）"),
+    mode: str = typer.Option(
+        "online", "--mode", "-m", help="检索模式: online (实时API) | surge (SurGE语料库)"
+    ),
 ) -> None:
     """
     完整研究流程：领域分析 → 批量检索 → 深度解析 + 关联分析 + 质量评估 → 中/英综述生成
@@ -367,8 +370,8 @@ def full_research_command(
     _run_workflow(
         prefix="full",
         prompt_text=topic,
-        run_label="🚀 启动完整研究流程：" + topic,
-        workflow_fn=lambda: _call_full(topic),
+        run_label=f"🚀 启动完整研究流程（{mode}模式）：" + topic,
+        workflow_fn=lambda: _call_full(topic, mode),
         expected_files=[
             ("prompt.txt",                   "输入的研究主题",                                  "文本"),
             ("run.log",                      "完整运行日志",                                    "文本"),
@@ -385,9 +388,9 @@ def full_research_command(
     )
 
 
-def _call_full(topic: str) -> None:
+def _call_full(topic: str, mode: str = "online") -> None:
     from mars.crews.full_research_crew import run_full_research
-    run_full_research(topic)
+    run_full_research(topic, corpus_mode=mode)
     return None
 
 
