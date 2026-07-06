@@ -531,6 +531,60 @@ def evaluate_command(
     console.print(f"\n[dim]💾 评估报告已保存至：{report_path.resolve()}[/dim]")
 
 
+@app.command("benchmark")
+def benchmark_command(
+    surge_dir: str = typer.Option(
+        "D:/PersonalResearch/PapersWS/Paper-MARS/Ref/SurGE/data",
+        "--surge-dir", help="SurGE data 目录路径",
+    ),
+    action: str = typer.Option(
+        "compare", "--action", "-a", help="compare (加载baseline+对比) | run (运行MARS+评估) | all (全部)"
+    ),
+    topics: str = typer.Option(
+        "", "--topics", help="逗号分隔的 topic ID 列表（默认全部41个测试topic）"
+    ),
+) -> None:
+    """
+    SurGE Benchmark: MARS vs AutoSurvey / ID / Naive 在 41 个 topic 上的对比评估
+    """
+    from mars.evaluation.benchmark_runner import BenchmarkRunner
+
+    _print_banner(console)
+    console.print("\n[bold green]📊 SurGE Benchmark[/bold green]\n")
+
+    runner = BenchmarkRunner(surge_dir=surge_dir)
+
+    # Parse topics
+    topic_list = None
+    if topics:
+        topic_list = [t.strip() for t in topics.split(",") if t.strip()]
+
+    if action in ("compare", "all"):
+        console.print("[bold]加载 SurGE Baselines...[/bold]")
+        runner.load_baselines()
+        for name, br in runner.results.items():
+            console.print(
+                f"  {name}: {br.num_topics} topics, "
+                f"Recall={br.avg_recall:.4f}, F1={br.avg_f1:.4f}"
+            )
+
+    if action in ("run", "all"):
+        console.print("\n[bold]运行 MARS (surge mode)...[/bold]")
+        runner.run_mars(corpus_mode="surge", topics=topic_list)
+        mars_result = runner.results.get("MARS")
+        if mars_result:
+            console.print(
+                f"\n[bold cyan]MARS: {mars_result.num_topics} topics, "
+                f"Recall={mars_result.avg_recall:.4f}, F1={mars_result.avg_f1:.4f}[/bold cyan]"
+            )
+
+    if runner.results:
+        console.print("\n[bold]Comparison Table:[/bold]")
+        console.print(runner.compare())
+        out = runner.save_results()
+        console.print(f"\n[dim]💾 结果保存至: {out}[/dim]")
+
+
 @app.command("check")
 def check_command() -> None:
     """

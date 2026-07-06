@@ -14,17 +14,40 @@ from typing import List, Set, Tuple
 def extract_cited_paper_titles(text: str) -> List[str]:
     """Extract paper titles from a generated survey's reference section.
 
-    Looks for patterns like ``[N] Title. Authors. Venue, Year.`` in the
-    reference list and returns the cleaned title strings.
+    Handles two common reference formats:
+
+    1. ``[N] Title. Authors, Venue, Year.`` (standard academic)
+    2. ``[N] Title`` (SurGE baseline format — title only)
     """
     titles: List[str] = []
-    # Match reference entries: [N] Title. Authors...
-    ref_pattern = re.compile(
-        r'\[\d+\]\s+(.+?)(?:\.\s+(?:[A-Z][a-z]+|[A-Z]\.))',
+
+    # Find reference section boundaries
+    ref_section = re.search(
+        r'(?:^##\s*(?:References?|参考文献))',
+        text, re.MULTILINE | re.IGNORECASE,
+    )
+    search_text = text[ref_section.start():] if ref_section else text
+
+    # Pattern 1: [N] Title. Authors, Venue... (verbose format)
+    pattern1 = re.compile(
+        r'^\[\d+\]\s+(.+?)\.\s+(?:[A-Z][a-z]+(?:[\s.][A-Z][a-z]+)*)',
         re.MULTILINE,
     )
-    for match in ref_pattern.finditer(text):
-        titles.append(match.group(1).strip())
+    for match in pattern1.finditer(search_text):
+        title = match.group(1).strip()
+        if len(title) > 5:
+            titles.append(title)
+
+    # Pattern 2: [N] Title (bare format — SurGE baselines)
+    pattern2 = re.compile(
+        r'^\[\d+\]\s+(.+?)$',
+        re.MULTILINE,
+    )
+    for match in pattern2.finditer(search_text):
+        title = match.group(1).strip()
+        if len(title) > 5 and title not in titles:
+            titles.append(title)
+
     return titles
 
 
