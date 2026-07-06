@@ -172,6 +172,37 @@ def create_english_review_task(
 
 
 # ---------------------------------------------------------------------------
+# 5b. Refinement task (iterative improvement loop)
+# ---------------------------------------------------------------------------
+
+def create_refinement_task(
+    agent: Agent,
+    topic: str,
+    previous_survey: str,
+    evaluation_feedback: str,
+    output_filename: str = "review_en.md",
+    *,
+    context: list[Task] | None = None,
+) -> Task:
+    """Task: revise a survey draft based on LLM-as-Judge evaluation feedback.
+
+    This is the core of the iterative refinement loop (EXP-1.1).
+    """
+    desc, exp = _load_prompt("refinement_task")
+    return Task(
+        description=desc.format(
+            topic=topic,
+            previous_survey=previous_survey,
+            evaluation_feedback=evaluation_feedback,
+            output_filename=output_filename,
+        ),
+        expected_output=exp,
+        agent=agent,
+        context=context or [],
+    )
+
+
+# ---------------------------------------------------------------------------
 # 6. Evaluator Agent tasks
 # ---------------------------------------------------------------------------
 

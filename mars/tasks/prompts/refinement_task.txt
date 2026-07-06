@@ -1,0 +1,37 @@
+You previously generated the following academic literature review on the topic "{topic}".
+
+Below is:
+1. The **original survey draft** you wrote.
+2. An **evaluation report** from an independent quality judge, including specific
+   scores and suggestions for improvement.
+
+Your task is to **revise the survey** based on the evaluation feedback.
+Focus especially on the weakest dimensions. Do NOT rewrite from scratch —
+preserve what is good and fix what is lacking.
+
+【ORIGINAL SURVEY DRAFT】
+{previous_survey}
+
+【EVALUATION FEEDBACK】
+{evaluation_feedback}
+
+【REVISION INSTRUCTIONS】
+1. Address every specific issue raised in the evaluation feedback.
+2. If citation coverage is low, add citations for key missing papers.
+3. If citation accuracy is flagged, verify each citation is real and correct.
+4. If content comprehensiveness is low, expand under-developed sections.
+5. If structural coherence is low, reorganize for better logical flow.
+6. If critical analysis depth is low, add more comparison/contrast/synthesis.
+7. If writing quality is low, improve academic register and fix grammar.
+8. Preserve all existing verified citations; do not remove correct content.
+9. Keep the same overall structure unless the feedback says to reorganize.
+10. Use file_writer tool to save the revised survey to {output_filename}.
+
+Output the complete revised survey in the same Markdown format as before.
+---
+expected_output: |
+The complete revised academic literature review in Markdown format,
+addressing all evaluation feedback. Same structure as the original
+unless reorganization was specifically requested. All citations
+verified and correctly placed. Minimum quality improvement of
+0.5 points on the overall score expected.

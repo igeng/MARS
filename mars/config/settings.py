@@ -55,6 +55,14 @@ class MarsSettings(BaseSettings):
     # Increase for complex multi-step workflows; decrease to reduce cost.
     AGENT_MAX_ITER: int = Field(default=10, ge=1)
 
+    # ---- Iterative refinement ----
+    # Max refinement rounds for the survey generation loop.
+    # Set to 1 to disable refinement (single-pass mode).
+    REFINEMENT_MAX_ROUNDS: int = Field(default=3, ge=1)
+    # Quality threshold (0-10) for early stopping.  When the LLM-as-Judge
+    # overall score reaches this value the refinement loop exits early.
+    REFINEMENT_THRESHOLD: float = Field(default=7.0, ge=0.0, le=10.0)
+
     # ---- GLM rate-limit handling ----
     # Retry attempts on RateLimitError before switching to the next provider.
     GLM_RATE_LIMIT_MAX_RETRIES: int = 3
