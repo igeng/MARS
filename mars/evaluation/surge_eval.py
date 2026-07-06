@@ -299,6 +299,7 @@ class SurGEEvaluator:
         generated_survey: str,
         *,
         generated_refs: Optional[List[str]] = None,
+        surge_passage_path: str | None = None,
     ) -> SurGEResult:
         """Evaluate a generated survey against SurGE ground-truth.
 
@@ -308,6 +309,8 @@ class SurGEEvaluator:
             generated_refs: Pre-extracted paper titles from the generated
                 survey.  When None, titles are extracted automatically from
                 the reference section of *generated_survey*.
+            surge_passage_path: Path to the .md file for SurGE's parse_refs.
+                When provided, uses SurGE's own title→doc_id matching.
 
         Returns:
             :class:`SurGEResult` with recall, precision, F1, and counts.
@@ -319,22 +322,26 @@ class SurGEEvaluator:
 
         gt_refs = self._gt_refs.get(topic_id, [])
         gt_titles = [r["title"] for r in gt_refs]
-
-        if generated_refs is None:
-            generated_refs = extract_cited_paper_titles(generated_survey)
-
-        # Try doc_id-based matching first (surge mode)
         gt_doc_ids = [r.get("doc_id", "") for r in gt_refs if r.get("doc_id")]
-        gen_doc_ids = extract_doc_ids_from_paper_search(settings.OUTPUT_DIR)
 
+        # ---- Priority 1: doc_id from paper_search.json (surge mode MARS) ----
+        gen_doc_ids = extract_doc_ids_from_paper_search(settings.OUTPUT_DIR)
         if gt_doc_ids and gen_doc_ids:
             metrics = compute_citation_metrics_from_doc_ids(
                 list(gen_doc_ids), gt_doc_ids,
             )
-            logger.info("Using doc_id matching: %d gen, %d gt, %d matched",
+            logger.info("doc_id matching: %d gen, %d gt, %d matched",
                         metrics["generated_count"], metrics["ground_truth_count"],
                         metrics["matched_count"])
+        # ---- Priority 2: SurGE parse_refs + title2docid (baselines) ----
+        elif surge_passage_path and Path(surge_passage_path).is_file():
+            metrics = self._evaluate_via_surge_parser(
+                topic_id, surge_passage_path, gt_doc_ids,
+            )
+        # ---- Fallback: title fuzzy matching ----
         else:
+            if generated_refs is None:
+                generated_refs = extract_cited_paper_titles(generated_survey)
             metrics = compute_citation_metrics(generated_refs, gt_titles, fuzzy=True)
 
         # ROUGE-L if gold survey available
@@ -395,6 +402,53 @@ class SurGEEvaluator:
                 else None
             ),
         }
+
+    def _evaluate_via_surge_parser(
+        self, topic_id: str, passage_path: str, gt_doc_ids: List[str],
+    ) -> dict:
+        """Use SurGE's own parse_refs + normalize_string + title2docid.
+
+        This replicates the exact matching logic from SurGE's evaluator.py
+        single_eval() method, ensuring baseline scores match the paper.
+        """
+        import sys, os as _os
+        surge_src = _os.environ.get(
+            "SURGE_SRC_PATH",
+            "D:/PersonalResearch/PapersWS/Paper-MARS/Ref/SurGE/src",
+        )
+        if surge_src not in sys.path:
+            sys.path.insert(0, surge_src)
+
+        try:
+            from markdownParser import parse_refs
+        except ImportError:
+            return compute_citation_metrics([], [], fuzzy=True)
+
+        # Build title2docid from ground truth (same as SurGE's normalize_string)
+        import re as _re
+
+        def _normalize(s):
+            letters = _re.findall(r'[a-zA-Z]', s)
+            return ''.join(letters).lower()
+
+        title2docid = {}
+        for r in self._gt_refs.get(topic_id, []):
+            title = r.get("title", "")
+            if title:
+                title2docid[_normalize(title)] = r.get("doc_id", "")
+
+        # Parse references from passage using SurGE's own parser
+        refs = parse_refs(passage_path)  # {ref_num: title}
+        gen_doc_ids = []
+        for _ref_num, ref_title in refs.items():
+            norm = _normalize(ref_title)
+            if norm in title2docid:
+                gen_doc_ids.append(str(title2docid[norm]))
+
+        if gt_doc_ids and gen_doc_ids:
+            return compute_citation_metrics_from_doc_ids(gen_doc_ids, gt_doc_ids)
+        else:
+            return compute_citation_metrics([], [], fuzzy=True)
 
     def save_results(self, results: List[SurGEResult], path: Path | str) -> None:
         """Save evaluation results as JSON."""

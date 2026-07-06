@@ -123,9 +123,12 @@ class BenchmarkRunner:
                 continue
 
             survey_text = md_files[0].read_text(encoding="utf-8", errors="replace")
-            # Use SurGE evaluator which does title-based fuzzy matching
+            # Use SurGE's own parse_refs + title2docid for accurate matching
             try:
-                r = self.evaluator.evaluate(topic_id, survey_text)
+                r = self.evaluator.evaluate(
+                    topic_id, survey_text,
+                    surge_passage_path=str(md_files[0]),
+                )
                 c_recalls.append(r.recall)
                 c_precisions.append(r.precision)
                 c_f1s.append(r.f1)
