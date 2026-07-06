@@ -19,6 +19,25 @@ from typing import IO, Optional
 
 
 # ---------------------------------------------------------------------------
+# Safe formatter — never crashes on missing fields
+# ---------------------------------------------------------------------------
+
+class _SafeFormatter(logging.Formatter):
+    """Formatter that substitutes missing fields with defaults."""
+
+    def __init__(self, fmt=None, datefmt=None, style="%", defaults=None):
+        super().__init__(fmt, datefmt, style)
+        self._defaults = defaults or {}
+
+    def format(self, record):
+        # Ensure defaults exist on the record before formatting
+        for key, val in self._defaults.items():
+            if not hasattr(record, key):
+                setattr(record, key, val)
+        return super().format(record)
+
+
+# ---------------------------------------------------------------------------
 # Log filter that injects a per-run identifier into every log record.
 # ---------------------------------------------------------------------------
 
@@ -69,9 +88,10 @@ def setup_logging(log_stream: Optional[IO[str]] = None) -> None:
 
     level = getattr(logging, settings.LOG_LEVEL.upper(), logging.INFO)
 
-    formatter = logging.Formatter(
+    formatter = _SafeFormatter(
         fmt="%(asctime)s | %(levelname)-7s | %(run_id)s | %(name)s | %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
+        defaults={"run_id": "-"},
     )
 
     root = logging.getLogger()
