@@ -30,6 +30,8 @@ from mars.evaluation.metrics import compute_citation_metrics
 from mars.evaluation.surge_eval import SurGEEvaluator, SurGEResult
 from mars.evaluation.llm_judge import LLMJudge, JudgeResult
 from mars.evaluation.hallucination_checker import HallucinationChecker, HallucinationReport
+from mars.evaluation.surge_metrics import SurGEMetrics
+from mars.evaluation.benchmark_runner import BenchmarkRunner
 
 __all__ = [
     "compute_citation_metrics",
@@ -39,4 +41,6 @@ __all__ = [
     "JudgeResult",
     "HallucinationChecker",
     "HallucinationReport",
+    "SurGEMetrics",
+    "BenchmarkRunner",
 ]
