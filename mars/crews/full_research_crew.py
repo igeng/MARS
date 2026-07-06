@@ -327,36 +327,54 @@ def _run_refinement_loop(
 
 
 def _format_judge_feedback(judge_result) -> str:
-    """Convert a JudgeResult into human-readable feedback for the revision prompt."""
-    d = judge_result.to_dict()
+    """Convert a 12-dimension JudgeResult into human-readable feedback."""
+    d = judge_result.to_flat_dict()
     lines = [
         f"**Overall Score**: {d['overall_score']}/10",
-        f"**Overall Comment**: {d.get('overall_comment', 'N/A')}",
+        f"  - Core Quality:     {d['core_quality']}/10 (weight 60%)",
+        f"  - Writing Quality:  {d['writing_quality']}/10 (weight 20%)",
+        f"  - Content Depth:    {d['content_depth']}/10 (weight 20%)",
+        f"**Overall Comment**: {judge_result.overall_comment or 'N/A'}",
         "",
-        "**Dimension Scores**:",
+        "**Core Quality (60%)**:",
     ]
-    dims = [
-        ("citation_coverage", "Citation Coverage"),
-        ("citation_accuracy", "Citation Accuracy"),
-        ("content_comprehensiveness", "Content Comprehensiveness"),
-        ("structural_coherence", "Structural Coherence"),
-        ("critical_analysis_depth", "Critical Analysis Depth"),
-        ("writing_quality", "Writing Quality"),
-    ]
-    for key, label in dims:
-        score = d.get(key, "N/A")
-        lines.append(f"- {label}: **{score}/10**")
+    for k in ["citation_coverage", "citation_accuracy", "synthesis_quality", "organization"]:
+        score = d.get(k, "N/A")
+        label = {"citation_coverage": "Citation Coverage", "citation_accuracy": "Citation Accuracy",
+                 "synthesis_quality": "Synthesis Quality", "organization": "Organization"}[k]
+        lines.append(f"  - {label}: **{score}/10**")
 
-    # Add specific improvement suggestions based on lowest scores
-    sorted_dims = sorted(
-        [(k, v) for k, v in dims if d.get(k, 10) < 7],
-        key=lambda x: d.get(x[0], 10),
-    )
-    if sorted_dims:
+    lines.append("")
+    lines.append("**Writing Quality (20%)**:")
+    for k in ["readability", "academic_rigor", "clarity", "coherence"]:
+        score = d.get(k, "N/A")
+        label = {"readability": "Readability", "academic_rigor": "Academic Rigor",
+                 "clarity": "Clarity", "coherence": "Coherence"}[k]
+        lines.append(f"  - {label}: **{score}/10**")
+
+    lines.append("")
+    lines.append("**Content Depth (20%)**:")
+    for k in ["comprehensiveness", "critical_analysis", "novelty_insights", "future_directions"]:
+        score = d.get(k, "N/A")
+        label = {"comprehensiveness": "Comprehensiveness", "critical_analysis": "Critical Analysis",
+                 "novelty_insights": "Novelty / Insights", "future_directions": "Future Directions"}[k]
+        lines.append(f"  - {label}: **{score}/10**")
+
+    # Priority improvements based on lowest-scoring dimensions
+    all_dims = [
+        (k, d.get(k, 10)) for k in [
+            "citation_coverage", "citation_accuracy", "synthesis_quality", "organization",
+            "readability", "academic_rigor", "clarity", "coherence",
+            "comprehensiveness", "critical_analysis", "novelty_insights", "future_directions",
+        ]
+    ]
+    low_dims = sorted(all_dims, key=lambda x: x[1])[:4]
+    if low_dims and low_dims[0][1] < 7:
         lines.append("")
         lines.append("**Priority improvements needed**:")
-        for key, label in sorted_dims:
-            lines.append(f"- **{label}** (score: {d.get(key)}/10) — needs significant improvement")
+        for key, score in low_dims:
+            from mars.evaluation.llm_judge import _DIM_LABELS
+            lines.append(f"- **{_DIM_LABELS[key]}** (score: {score}/10)")
 
     return "\n".join(lines)
 

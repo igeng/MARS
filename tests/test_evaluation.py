@@ -163,25 +163,40 @@ class TestLLMJudge:
 {
   "citation_coverage": {"score": 8, "reasoning": "Good coverage"},
   "citation_accuracy": {"score": 7, "reasoning": "Minor issues"},
-  "content_comprehensiveness": {"score": 9, "reasoning": "Comprehensive"},
-  "structural_coherence": {"score": 8, "reasoning": "Well organized"},
-  "critical_analysis_depth": {"score": 6, "reasoning": "Could be deeper"},
-  "writing_quality": {"score": 8, "reasoning": "Good academic prose"},
+  "synthesis_quality": {"score": 9, "reasoning": "Strong synthesis"},
+  "organization": {"score": 8, "reasoning": "Well organized"},
+  "readability": {"score": 8, "reasoning": "Good flow"},
+  "academic_rigor": {"score": 7, "reasoning": "Adequate"},
+  "clarity": {"score": 8, "reasoning": "Clear"},
+  "coherence": {"score": 7, "reasoning": "Mostly coherent"},
+  "comprehensiveness": {"score": 9, "reasoning": "Comprehensive"},
+  "critical_analysis": {"score": 6, "reasoning": "Could be deeper"},
+  "novelty_insights": {"score": 5, "reasoning": "Limited novelty"},
+  "future_directions": {"score": 7, "reasoning": "Reasonable"},
   "overall_comment": "A solid survey with room for deeper analysis."
 }
 ```'''
         parsed = LLMJudge._parse_response(raw)
         assert parsed["citation_coverage"] == 8
-        assert parsed["critical_analysis_depth"] == 6
+        assert parsed["critical_analysis"] == 6
+        assert parsed["novelty_insights"] == 5
         assert "solid survey" in parsed["overall_comment"]
 
     def test_parse_flat_json_response(self) -> None:
         from mars.evaluation.llm_judge import LLMJudge
 
-        raw = '{"citation_coverage": 7, "citation_accuracy": 8, "content_comprehensiveness": 6, "structural_coherence": 7, "critical_analysis_depth": 5, "writing_quality": 9, "overall_comment": "ok"}'
+        raw = (
+            '{"citation_coverage": 7, "citation_accuracy": 8,'
+            '"synthesis_quality": 6, "organization": 7,'
+            '"readability": 8, "academic_rigor": 7, "clarity": 8, "coherence": 7,'
+            '"comprehensiveness": 6, "critical_analysis": 5,'
+            '"novelty_insights": 4, "future_directions": 6,'
+            '"overall_comment": "ok"}'
+        )
         parsed = LLMJudge._parse_response(raw)
         assert parsed["citation_coverage"] == 7
-        assert parsed["writing_quality"] == 9
+        assert parsed["comprehensiveness"] == 6
+        assert parsed["novelty_insights"] == 4
 
     def test_parse_garbled_response_returns_fallback(self) -> None:
         from mars.evaluation.llm_judge import LLMJudge
@@ -195,8 +210,10 @@ class TestLLMJudge:
 
         r = JudgeResult(
             citation_coverage=8, citation_accuracy=7,
-            content_comprehensiveness=8, structural_coherence=7,
-            critical_analysis_depth=7, writing_quality=8,
+            synthesis_quality=7, organization=8,
+            readability=8, academic_rigor=7, clarity=8, coherence=7,
+            comprehensiveness=7, critical_analysis=7,
+            novelty_insights=7, future_directions=8,
             overall_score=7.5,
         )
         assert r.passed(threshold=7.0) is True
