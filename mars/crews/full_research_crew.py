@@ -1,12 +1,13 @@
 """
 Full Research Crew - 完整研究流程（含 RAG + 迭代精炼）
 
-5-Phase Flow:
+6-Phase Flow:
   Phase 1: Analysis (domain → search → deep → connect → evaluate)
   Phase 2: RAG Indexing (paper_search.json → ChromaDB vector store)
-  Phase 3: First-pass English Review (Summarizer with search_papers RAG)
-  Phase 4: Iterative Refinement (LLM-as-Judge → revise → re-evaluate)
-  Phase 5: Chinese Translation + Final Synthesis Report
+  Phase 3: Outline Generation + Validation (structure before content)
+  Phase 4: First-pass English Review (Summarizer following validated outline)
+  Phase 5: Iterative Refinement (LLM-as-Judge → revise → re-evaluate)
+  Phase 6: Chinese Translation + Final Synthesis Report
 """
 
 from __future__ import annotations
@@ -31,6 +32,7 @@ from mars.tasks.task_definitions import (
     create_domain_analysis_task,
     create_english_review_task,
     create_full_research_synthesis_task,
+    create_outline_generation_task,
     create_paper_search_task,
     create_quality_evaluation_task,
     create_refinement_task,
@@ -78,6 +80,111 @@ def _build_analysis_crew(topic: str) -> Crew:
         verbose=True,
         memory=settings.ENABLE_MEMORY,
     )
+
+
+# ---------------------------------------------------------------------------
+# Outline quality control (EXP-1.3)
+# ---------------------------------------------------------------------------
+
+# Required top-level sections for a valid academic survey outline.
+_REQUIRED_SECTIONS = [
+    "introduction",
+    "background",
+    "method",
+    "compar",
+    "challeng",
+    "future",
+    "conclusion",
+]
+
+
+def _validate_outline(outline_text: str) -> tuple[bool, list[str]]:
+    """Validate a survey outline against structural heuristics.
+
+    Returns:
+        (is_valid, issues) — True if the outline passes all checks,
+        plus a list of human-readable issue descriptions.
+    """
+    issues: list[str] = []
+    lower = outline_text.lower()
+
+    # 1. Required sections present
+    for required in _REQUIRED_SECTIONS:
+        if required not in lower:
+            issues.append(f"Missing required section containing '{required}'")
+
+    # 2. Has subsections (marked by ###)
+    subsection_count = lower.count("### subsection")
+    if subsection_count < 4:
+        issues.append(f"Only {subsection_count} subsections found (need ≥ 4)")
+
+    # 3. Has section word estimates
+    if "~" not in outline_text and "words" not in lower:
+        issues.append("No word count estimates found per section")
+
+    # 4. Has paper assignments
+    paper_markers = outline_text.count("[") + outline_text.count("Key papers")
+    if paper_markers < 3:
+        issues.append("Too few paper-to-section assignments")
+
+    # 5. Max depth check (count ### markers as indicator of depth)
+    too_deep = [line for line in outline_text.split("\n") if line.strip().startswith("####")]
+    if too_deep:
+        issues.append(f"Outline exceeds max depth (level 3) — {len(too_deep)} level-4 headings found")
+
+    is_valid = len(issues) == 0
+    return is_valid, issues
+
+
+def _generate_outline(topic: str) -> str:
+    """Generate a validated outline via the Summarizer agent.
+
+    Retries up to 2 times if validation fails.
+    """
+    from mars.tasks.task_definitions import create_outline_generation_task
+
+    summarizer = create_summarizer_agent()
+    max_retries = 2
+
+    for attempt in range(1, max_retries + 2):  # 1 initial + 2 retries
+        logger.info("Outline generation attempt %d...", attempt)
+        outline_task = create_outline_generation_task(summarizer, topic)
+        outline_crew = Crew(
+            agents=[summarizer],
+            tasks=[outline_task],
+            process=Process.sequential,
+            verbose=True,
+        )
+        outline_crew.kickoff()
+
+        # Read the generated outline from file_writer output
+        outline_text = _read_generated_file("outline.md")
+        if not outline_text:
+            # Fallback: read from crew output
+            outline_path = settings.OUTPUT_DIR / "outline.md"
+            if outline_path.is_file():
+                outline_text = outline_path.read_text(encoding="utf-8")
+
+        if not outline_text:
+            logger.warning("Outline generation attempt %d produced no output.", attempt)
+            continue
+
+        # Validate
+        is_valid, issues = _validate_outline(outline_text)
+        if is_valid:
+            logger.info("Outline validated successfully (attempt %d).", attempt)
+            return outline_text
+
+        logger.warning(
+            "Outline validation failed (attempt %d): %s",
+            attempt, "; ".join(issues),
+        )
+        if attempt <= max_retries:
+            logger.info("Regenerating outline with feedback...")
+
+    # Return the last attempt even if invalid — better than nothing
+    logger.warning("Outline validation failed after all attempts — using last draft.")
+    return outline_text or f"# Survey Outline: {topic}\n\n(Outline generation failed)"
 
 
 # ---------------------------------------------------------------------------
@@ -389,8 +496,13 @@ def run_full_research(topic: str) -> str:
     indexed = _index_papers_for_rag()
     logger.info("Indexed %d papers for RAG-enhanced generation.", indexed)
 
-    # ---- Phase 3: First-pass English review ----
-    logger.info("Phase 3: Generating initial English review...")
+    # ---- Phase 3: Outline generation + validation (EXP-1.3) ----
+    logger.info("Phase 3: Generating and validating survey outline...")
+    outline_text = _generate_outline(topic)
+    logger.info("Outline: %d chars", len(outline_text))
+
+    # ---- Phase 4: First-pass English review (following validated outline) ----
+    logger.info("Phase 4: Generating initial English review...")
     summarizer = create_summarizer_agent()
     english_task = create_english_review_task(summarizer, topic)
 
@@ -405,8 +517,8 @@ def run_full_research(topic: str) -> str:
     initial_draft = _read_generated_file("review_en.md") or ""
     logger.info("Initial draft: %d chars", len(initial_draft))
 
-    # ---- Phase 4: Iterative refinement (EXP-1.1) ----
-    logger.info("Phase 4: Iterative refinement loop...")
+    # ---- Phase 5: Iterative refinement (EXP-1.1) ----
+    logger.info("Phase 5: Iterative refinement loop...")
     refined_draft = _run_refinement_loop(topic, initial_draft)
 
     # If the refinement produced a better draft, write it as the final version
@@ -416,8 +528,8 @@ def run_full_research(topic: str) -> str:
         logger.info("Refined draft saved (%d chars → %d chars).",
                      len(initial_draft), len(refined_draft))
 
-    # ---- Phase 5: Chinese translation + synthesis ----
-    logger.info("Phase 5: Chinese translation + synthesis report...")
+    # ---- Phase 6: Chinese translation + synthesis ----
+    logger.info("Phase 6: Chinese translation + synthesis report...")
     chinese_task = create_review_generation_task(summarizer, topic)
     synthesis_task = create_full_research_synthesis_task(summarizer, topic)
 

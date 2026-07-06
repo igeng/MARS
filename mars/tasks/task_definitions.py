@@ -172,6 +172,26 @@ def create_english_review_task(
 
 
 # ---------------------------------------------------------------------------
+# 5a. Outline generation task (EXP-1.3)
+# ---------------------------------------------------------------------------
+
+def create_outline_generation_task(
+    agent: Agent,
+    topic: str,
+    *,
+    context: list[Task] | None = None,
+) -> Task:
+    """Task: generate a validated hierarchical outline before writing the full survey."""
+    desc, exp = _load_prompt("outline_generation_task")
+    return Task(
+        description=desc.format(topic=topic),
+        expected_output=exp,
+        agent=agent,
+        context=context or [],
+    )
+
+
+# ---------------------------------------------------------------------------
 # 5b. Refinement task (iterative improvement loop)
 # ---------------------------------------------------------------------------
 

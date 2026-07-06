@@ -1,0 +1,61 @@
+Based on the domain analysis, paper search, deep analysis, connection analysis,
+and quality evaluation results, generate a **detailed hierarchical outline**
+for an academic literature review on:
+
+{topic}
+
+【Outline Requirements】
+1. Follow the standard survey structure:
+   - Title
+   - Abstract
+   - 1. Introduction
+   - 2. Background / Preliminaries
+   - 3. Core Methods / Techniques (2-4 subsections)
+   - 4. Comparative Analysis
+   - 5. Open Problems and Challenges
+   - 6. Future Research Directions
+   - 7. Conclusion
+   - References
+
+2. Each section (3-6) must have 2-4 subsections.
+3. Max depth: 3 levels (section → subsection → sub-subsection).
+4. Every subsection must name specific papers that will be discussed there.
+5. Estimated word count per section (total ~3500 words):
+   - Abstract: ~200 words
+   - Introduction: ~500 words
+   - Background: ~500 words
+   - Core Methods: ~1000 words (split across subsections)
+   - Comparative Analysis: ~500 words
+   - Open Problems: ~400 words
+   - Future Directions: ~400 words
+   - Conclusion: ~200 words
+
+6. Mark which papers from the analysis results will be cited in each subsection.
+   Use format: [N] Paper Title (Year) — brief note on what aspect to discuss.
+
+【Output Format】
+Output the outline in this exact format:
+
+# Review Outline: {topic}
+
+## Section: [Section Name] (~N words)
+### Subsection: [Subsection Name]
+- Key papers: [N] Title (Year), [M] Title (Year)
+- Key points to cover: ...
+
+### Subsection: [Subsection Name]
+- Key papers: ...
+- Key points to cover: ...
+
+(Repeat for all sections)
+
+At the end, include:
+## Outline Statistics
+- Total sections: N
+- Total subsections: N
+- Max depth: N
+- Estimated total words: N
+---
+expected_output: |
+A complete hierarchical outline with all required sections, subsections with
+assigned papers and word count estimates. Total estimated words ~3500.
