@@ -4,13 +4,27 @@ SurGE benchmark evaluator for MARS.
 Evaluates MARS-generated surveys against ground-truth reference data from
 the SurGE benchmark (Tsinghua University, 2025).
 
-Dataset format expected under ``data_dir/``::
+Two ways to load data:
 
-    data_dir/
-    ├── topics.json              # {"topic_id": "research topic string", ...}
-    ├── ground_truth_refs.json   # {"topic_id": [{"title": "...", "doi": "...", "arxiv_id": "..."}, ...]}
-    └── gold_surveys/            # (optional) {"topic_id": "full survey markdown text", ...}
-            └── gold_surveys.json
+1. **MARS-converted format** (ready-to-use)::
+
+       evaluator = SurGEEvaluator(data_dir="data/surge")
+
+   Expects::
+
+       data_dir/
+       ├── topics.json              # {"topic_id": "topic string", ...}
+       ├── ground_truth_refs.json   # {"topic_id": [{"title":"...", ...}, ...]}
+       └── gold_surveys/            # (optional)
+
+2. **Direct SurGE repo loading** (when you have SurGE cloned)::
+
+       evaluator = SurGEEvaluator.from_surge(
+           surge_dir="D:/.../SurGE/data"
+       )
+
+   This uses :class:`mars.evaluation.surge_adapter.SurGEAdapter` to read the
+   official ``surveys.json`` (and optionally ``corpus.json``) directly.
 """
 
 from __future__ import annotations
@@ -171,9 +185,11 @@ class SurGEEvaluator:
     """Evaluate a MARS-generated survey against SurGE ground-truth data.
 
     Parameters:
-        data_dir: Path to SurGE data files.  When the directory is empty or
-            does not exist, the evaluator falls back to built-in minimal
-            benchmark data (12 CS topics).
+        data_dir: Path to MARS-format SurGE data files.  When the directory is
+            empty or does not exist, the evaluator falls back to built-in
+            minimal benchmark data (12 CS topics).
+
+    Use :meth:`from_surge` to load directly from an official SurGE repo clone.
     """
 
     def __init__(self, data_dir: str | Path = "data/surge"):
@@ -182,6 +198,42 @@ class SurGEEvaluator:
         self._gt_refs: Dict[str, List[Dict[str, str]]] = {}
         self._gold_surveys: Dict[str, str] = {}
         self._load_data()
+
+    # ------------------------------------------------------------------
+    # Factory: load directly from SurGE official dataset
+    # ------------------------------------------------------------------
+
+    @classmethod
+    def from_surge(
+        cls,
+        surge_dir: str | Path,
+        load_corpus: bool = False,
+    ) -> "SurGEEvaluator":
+        """Create evaluator directly from an official SurGE dataset clone.
+
+        Args:
+            surge_dir: Path to the SurGE ``data/`` directory containing
+                ``surveys.json``.
+            load_corpus: When True and ``corpus.json`` exists, enables
+                paper-title-level citation metrics.  Defaults to False
+                (doc_id-level only); enable when you have the full corpus.
+
+        Returns:
+            A :class:`SurGEEvaluator` pre-populated with 205 SurGE topics.
+        """
+        from mars.evaluation.surge_adapter import SurGEAdapter
+
+        adapter = SurGEAdapter(surge_dir, load_corpus=load_corpus)
+
+        evaluator = cls.__new__(cls)
+        evaluator._data_dir = Path(surge_dir)
+        evaluator._topics = adapter.get_topics()
+        evaluator._gt_refs = {}
+        for survey_id in evaluator._topics:
+            evaluator._gt_refs[survey_id] = adapter.get_ground_truth_refs(survey_id)
+        evaluator._gold_surveys = {}
+        evaluator._adapter = adapter  # keep ref for search/get_structure
+        return evaluator
 
     # ------------------------------------------------------------------
     # Data loading

@@ -433,6 +433,9 @@ def evaluate_command(
     topic_id: str = typer.Option(
         "", "--topic-id", "-t", help="SurGE topic ID（不指定则自动匹配）"
     ),
+    surge_dir: str = typer.Option(
+        "", "--surge-dir", help="SurGE data 目录路径（如 D:/.../SurGE/data），直接从官方数据集加载 205 个 topic"
+    ),
 ) -> None:
     """
     评估已生成的文献综述质量：SurGE benchmark + LLM-as-Judge + 幻觉检测
@@ -454,7 +457,11 @@ def evaluate_command(
 
     # 1. SurGE benchmark
     console.print("[bold]1/3 SurGE Benchmark 评估...[/bold]")
-    evaluator = SurGEEvaluator()
+    if surge_dir:
+        evaluator = SurGEEvaluator.from_surge(surge_dir)
+        console.print(f"   从 SurGE 加载: {len(evaluator.topic_ids)} 个 topic")
+    else:
+        evaluator = SurGEEvaluator()
     if not topic_id:
         # Auto-match: find topic id that best matches the topic string
         for tid, tname in evaluator.topics.items():

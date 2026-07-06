@@ -91,7 +91,7 @@ class TestSurGEEvaluator:
     def test_get_ground_truth_refs(self) -> None:
         from mars.evaluation.surge_eval import SurGEEvaluator
 
-        evaluator = SurGEEvaluator()
+        evaluator = SurGEEvaluator(data_dir="data/surge_test_nonexistent")
         refs = evaluator.get_ground_truth_refs("federated_learning_privacy")
         assert len(refs) >= 5
         assert "title" in refs[0]
@@ -100,7 +100,7 @@ class TestSurGEEvaluator:
     def test_evaluate_returns_result(self) -> None:
         from mars.evaluation.surge_eval import SurGEEvaluator
 
-        evaluator = SurGEEvaluator()
+        evaluator = SurGEEvaluator(data_dir="data/surge_test_nonexistent")
 
         # Build a fake survey with some matching refs
         gt_refs = evaluator.get_ground_truth_refs("federated_learning_privacy")
@@ -118,14 +118,29 @@ class TestSurGEEvaluator:
     def test_evaluate_unknown_topic_raises(self) -> None:
         from mars.evaluation.surge_eval import SurGEEvaluator
 
-        evaluator = SurGEEvaluator()
+        evaluator = SurGEEvaluator(data_dir="data/surge_test_nonexistent")
         with pytest.raises(KeyError, match="Unknown topic"):
             evaluator.evaluate("nonexistent_topic", "content")
+
+    def test_from_surge_loads_real_data(self) -> None:
+        """Verify from_surge() loads the real SurGE surveys.json."""
+        from mars.evaluation.surge_eval import SurGEEvaluator
+
+        import os
+        surge_data = "D:/PersonalResearch/PapersWS/Paper-MARS/Ref/SurGE/data"
+        if not os.path.isdir(surge_data):
+            pytest.skip("SurGE data not available")
+        evaluator = SurGEEvaluator.from_surge(surge_data)
+        assert len(evaluator.topic_ids) == 205
+        # Topic IDs are numeric strings from SurGE
+        assert "0" in evaluator.topic_ids
+        refs = evaluator.get_ground_truth_refs("0")
+        assert len(refs) > 0
 
     def test_aggregate_results(self) -> None:
         from mars.evaluation.surge_eval import SurGEEvaluator, SurGEResult
 
-        evaluator = SurGEEvaluator()
+        evaluator = SurGEEvaluator(data_dir="data/surge_test_nonexistent")
         results = [
             SurGEResult("t1", "Topic 1", 0.8, 0.7, 0.75, 10, 12, 8),
             SurGEResult("t2", "Topic 2", 0.6, 0.9, 0.72, 15, 10, 6),
