@@ -585,6 +585,102 @@ def benchmark_command(
         console.print(f"\n[dim]💾 结果保存至: {out}[/dim]")
 
 
+# ---------------------------------------------------------------------------
+# Schedule subcommand group
+# ---------------------------------------------------------------------------
+
+schedule_app = typer.Typer(help="定时监控新论文", add_completion=False)
+app.add_typer(schedule_app, name="schedule")
+
+
+@schedule_app.command("add")
+def schedule_add(
+    topic: str = typer.Argument(..., help="研究主题"),
+    interval_hours: int = typer.Option(24, "--every", "-e", help="间隔小时数"),
+    at_time: str = typer.Option("09:00", "--at", help="每天执行时间 (HH:MM)"),
+    max_papers: int = typer.Option(50, "--max", "-n", help="每次检索论文数"),
+) -> None:
+    """添加定时研究主题"""
+    from mars.scheduler import Scheduler
+
+    sched = Scheduler()
+    sched.add(topic, interval_hours=interval_hours, at_time=at_time, max_papers=max_papers)
+    console.print(f"[green]✅ 已添加: '{topic}' — 每 {interval_hours}h 执行[/green]")
+
+
+@schedule_app.command("remove")
+def schedule_remove(
+    topic: str = typer.Argument(..., help="研究主题"),
+) -> None:
+    """删除定时研究主题"""
+    from mars.scheduler import Scheduler
+
+    sched = Scheduler()
+    if sched.remove(topic):
+        console.print(f"[green]✅ 已删除: '{topic}'[/green]")
+    else:
+        console.print(f"[yellow]⚠ 未找到: '{topic}'[/yellow]")
+
+
+@schedule_app.command("list")
+def schedule_list() -> None:
+    """列出所有定时研究主题"""
+    from mars.scheduler import Scheduler
+
+    sched = Scheduler()
+    entries = sched.list_all()
+    if not entries:
+        console.print("[dim]暂无定时任务。使用 'mars schedule add <topic>' 添加。[/dim]")
+        return
+
+    table = Table(title="定时研究任务")
+    table.add_column("主题", style="cyan")
+    table.add_column("间隔", style="white")
+    table.add_column("上次执行", style="dim")
+    table.add_column("状态", style="bold")
+    for e in entries:
+        table.add_row(
+            e.topic[:60],
+            f"每 {e.interval_hours}h @ {e.at_time}",
+            e.last_run[:16] if e.last_run else "从未",
+            "[green]启用[/green]" if e.enabled else "[red]禁用[/red]",
+        )
+    console.print(table)
+
+
+@schedule_app.command("run")
+def schedule_run() -> None:
+    """手动触发所有到期的定时任务"""
+    from mars.scheduler import Scheduler
+
+    _print_banner(console)
+    console.print("[bold green]⏰ 执行定时任务...[/bold green]\n")
+    sched = Scheduler()
+    results = sched.run_due()
+    if not results:
+        console.print("[dim]无到期任务。[/dim]")
+    for r in results:
+        icon = "✅" if r["status"] == "success" else "❌"
+        console.print(f"  {icon} {r['topic']}")
+
+
+@schedule_app.command("serve")
+def schedule_serve(
+    check_interval: int = typer.Option(60, "--interval", "-i", help="检查间隔（秒）"),
+) -> None:
+    """启动后台调度守护进程（Ctrl+C 停止）"""
+    from mars.scheduler import Scheduler
+
+    _print_banner(console)
+    console.print(
+        f"[bold green]🔄 启动调度守护进程...[/bold green] "
+        f"(每 {check_interval}s 检查一次)"
+    )
+    console.print("[dim]按 Ctrl+C 停止[/dim]\n")
+    sched = Scheduler()
+    sched.serve(check_interval=check_interval)
+
+
 @app.command("check")
 def check_command() -> None:
     """
