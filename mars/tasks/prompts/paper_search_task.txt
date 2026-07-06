@@ -13,6 +13,7 @@
 7. 使用file_writer工具将检索结果保存到paper_search.json
 
 输出要求：每篇论文包含title、authors、venue、year、citation_count（如有）、url、relevance_reason。
+如搜索结果包含 doc_id 字段，务必保留（用于精确评估）。
 ---
 expected_output: |
 最多{max_papers}篇论文的结构化列表，每篇包含：

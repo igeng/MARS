@@ -35,9 +35,12 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from mars.config import settings
 from mars.evaluation.metrics import (
     compute_citation_metrics,
+    compute_citation_metrics_from_doc_ids,
     extract_cited_paper_titles,
+    extract_doc_ids_from_paper_search,
     rouge_l,
 )
 
@@ -320,7 +323,19 @@ class SurGEEvaluator:
         if generated_refs is None:
             generated_refs = extract_cited_paper_titles(generated_survey)
 
-        metrics = compute_citation_metrics(generated_refs, gt_titles, fuzzy=True)
+        # Try doc_id-based matching first (surge mode)
+        gt_doc_ids = [r.get("doc_id", "") for r in gt_refs if r.get("doc_id")]
+        gen_doc_ids = extract_doc_ids_from_paper_search(settings.OUTPUT_DIR)
+
+        if gt_doc_ids and gen_doc_ids:
+            metrics = compute_citation_metrics_from_doc_ids(
+                list(gen_doc_ids), gt_doc_ids,
+            )
+            logger.info("Using doc_id matching: %d gen, %d gt, %d matched",
+                        metrics["generated_count"], metrics["ground_truth_count"],
+                        metrics["matched_count"])
+        else:
+            metrics = compute_citation_metrics(generated_refs, gt_titles, fuzzy=True)
 
         # ROUGE-L if gold survey available
         rouge = None

@@ -8,6 +8,7 @@ Citation Recall, Citation Precision, Citation F1 (CQF1), and coverage ratios.
 from __future__ import annotations
 
 import re
+from pathlib import Path
 from typing import List, Set, Tuple
 
 
@@ -123,6 +124,136 @@ def compute_citation_metrics(
         "ground_truth_count": gt_count,
         "matched_count": matched_count,
     }
+
+
+def compute_citation_metrics_from_doc_ids(
+    generated_doc_ids: List[str],
+    ground_truth_doc_ids: List[str],
+) -> dict:
+    """Compute Recall, Precision, F1 using exact doc_id matching.
+
+    This is the preferred method for SurGE mode, where both MARS citations
+    and ground-truth ``all_cites`` carry SurGE corpus doc_ids, enabling
+    precise set-intersection matching without title ambiguity.
+
+    Args:
+        generated_doc_ids: doc_ids cited by the generated survey.
+        ground_truth_doc_ids: doc_ids from SurGE ground-truth all_cites.
+
+    Returns:
+        Dict with recall, precision, f1, counts.
+    """
+    gen_set = set(str(d) for d in generated_doc_ids if d)
+    gt_set = set(str(d) for d in ground_truth_doc_ids if d)
+
+    matched = gen_set & gt_set
+    gen_count = len(gen_set)
+    gt_count = len(gt_set)
+    matched_count = len(matched)
+
+    recall = matched_count / gt_count if gt_count > 0 else 0.0
+    precision = matched_count / gen_count if gen_count > 0 else 0.0
+    f1 = (
+        2 * recall * precision / (recall + precision)
+        if (recall + precision) > 0
+        else 0.0
+    )
+
+    return {
+        "recall": round(recall, 4),
+        "precision": round(precision, 4),
+        "f1": round(f1, 4),
+        "generated_count": gen_count,
+        "ground_truth_count": gt_count,
+        "matched_count": matched_count,
+    }
+
+
+def extract_doc_ids_from_paper_search(
+    output_dir: str | Path,
+    corpus_path: str | None = None,
+) -> set:
+    """Extract all doc_ids from a paper_search.json file.
+
+    When the paper entries lack a ``doc_id`` field, falls back to searching
+    the SurGE corpus by paper title via TF-IDF to resolve doc_ids.
+
+    Args:
+        output_dir: Directory containing paper_search.json, or path to the file.
+        corpus_path: Path to SurGE corpus.json for title→doc_id resolution.
+            Auto-detected from SURGE_CORPUS_PATH env var if None.
+
+    Returns:
+        Set of doc_id strings.
+    """
+    import json as _json
+    import os as _os
+
+    path = Path(output_dir) / "paper_search.json" if not str(output_dir).endswith(".json") else Path(output_dir)
+    if not path.is_file():
+        return set()
+
+    try:
+        data = _json.loads(path.read_text(encoding="utf-8"))
+    except (_json.JSONDecodeError, OSError):
+        return set()
+
+    papers = data if isinstance(data, list) else list(data.values()) if isinstance(data, dict) else []
+    doc_ids = set()
+
+    for p in papers:
+        if not isinstance(p, dict):
+            continue
+        did = p.get("doc_id")
+        if did is not None:
+            doc_ids.add(str(did))
+
+    # If no doc_ids found in JSON, try title-based corpus lookup
+    if not doc_ids and corpus_path is None:
+        corpus_path = _os.environ.get(
+            "SURGE_CORPUS_PATH",
+            "D:/PersonalResearch/PapersWS/Paper-MARS/Ref/SurGE/data/corpus.json",
+        )
+
+    if not doc_ids and corpus_path and Path(corpus_path).is_file():
+        doc_ids = _resolve_doc_ids_by_title(papers, corpus_path)
+
+    return doc_ids
+
+
+def _resolve_doc_ids_by_title(
+    papers: list[dict],
+    corpus_path: str,
+) -> set:
+    """Resolve doc_ids by searching the SurGE corpus for each paper title.
+
+    Uses the pre-built TF-IDF index from surge_corpus_tool for fast lookup.
+    """
+    try:
+        from mars.tools.surge_corpus_tool import SurgeCorpusSearchTool
+        import json as _json
+
+        tool = SurgeCorpusSearchTool()
+        doc_ids = set()
+
+        for p in papers:
+            title = p.get("title", "")
+            if not title:
+                continue
+            result_str = tool._run(title, max_results=1)
+            try:
+                result = _json.loads(result_str)
+                results = result.get("results", [])
+                if results:
+                    did = results[0].get("doc_id")
+                    if did is not None:
+                        doc_ids.add(str(did))
+            except _json.JSONDecodeError:
+                pass
+
+        return doc_ids
+    except Exception:
+        return set()
 
 
 def compute_coverage_ratio(
