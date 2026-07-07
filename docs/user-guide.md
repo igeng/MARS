@@ -1752,7 +1752,27 @@ mars check
 
 ---
 
-## 12. 附录：API Key 获取指南
+## 12. SurGE Benchmark 评估
+
+MARS 支持在 **[SurGE](https://github.com/oneal2000/SurGE)** 基准（SIGIR 2026）上进行标准化评估：
+
+```bash
+# 使用 SurGE 语料库模式生成综述
+mars full --mode surge "federated learning"
+
+# 一键生成 + 全维度评估
+mars full --mode surge --eval "federated learning"
+
+# 加载 SurGE 基准对比
+mars benchmark --action compare
+
+# 单项评估
+mars evaluate --survey review_en.md "topic"
+```
+
+---
+
+## 13. 附录：API Key 获取指南
 
 ### 12.1 阿里云 Qwen (DashScope)
 

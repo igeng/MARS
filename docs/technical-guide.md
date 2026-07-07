@@ -808,11 +808,20 @@ curl http://localhost:8000/task/a1b2c3d4e5f6
 | 文件 | 测试内容 | 说明 |
 |------|----------|------|
 | `tests/conftest.py` | 共享 Fixture 和 Mock | Mock 外部 API、数据库等 |
-| `tests/test_basic.py` | 配置、工具、Agent/Crew 导入 | ~46 个测试 |
-| `tests/test_new_components.py` | Settings、LLM Gateway、DB、API、Tasks | ~33 个测试 |
-| `tests/test_usage_features.py` | 端到端使用功能 | ~26 个测试 |
+| `tests/test_basic.py` | 配置、工具、Agent/Crew 导入 | ~20 个测试 |
+| `tests/test_new_components.py` | Settings、LLM Gateway、DB、API、Tasks | ~30 个测试 |
+| `tests/test_usage_features.py` | 端到端使用功能 | ~25 个测试 |
+| `tests/test_gateway_and_crews.py` | LLM 网关 + Crew 编排 | ~20 个测试 |
+| `tests/test_evaluation.py` | SurGE 评估指标 | ~22 个测试 |
 
-**总计约 105 个测试，全部无需真实 API Key 即可通过。**
+**总计约 134 个测试，全部无需真实 API Key 即可通过。**
+
+### 14.3 SurGE Benchmark 评估
+
+MARS 使用 **[SurGE](https://github.com/oneal2000/SurGE)** 基准（SIGIR 2026）进行标准化评估。
+SurGE 提供 205 个 CS 领域的人工综述 + 1.09M 篇论文语料库。
+
+评估模块位于 `mars/evaluation/`，详见 [technical-guide.md#surge-benchmark](#)。
 
 ### 14.2 运行测试
 

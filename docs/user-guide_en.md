@@ -1753,7 +1753,27 @@ The output shows the configuration status of each provider (✅ Configured / ❌
 
 ---
 
-## 12. Appendix: API Key Acquisition Guide
+## 12. SurGE Benchmark Evaluation
+
+MARS supports standardized evaluation on the **[SurGE](https://github.com/oneal2000/SurGE)** benchmark (SIGIR 2026):
+
+```bash
+# Generate survey using SurGE corpus
+mars full --mode surge "federated learning"
+
+# Generate + auto-evaluate all dimensions
+mars full --mode surge --eval "federated learning"
+
+# Compare against SurGE baselines
+mars benchmark --action compare
+
+# Single survey evaluation
+mars evaluate --survey review_en.md "topic"
+```
+
+---
+
+## 13. Appendix: API Key Acquisition Guide
 
 ### 12.1 Alibaba Cloud Qwen (DashScope)
 

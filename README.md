@@ -330,6 +330,16 @@ MARS/
 │   ├── api/
 │   │   └── main.py            # FastAPI application
 │   │
+│   ├── evaluation/             # SurGE benchmark evaluation
+│   │   ├── surge_eval.py      # Citation metrics against ground truth
+│   │   ├── surge_adapter.py   # SurGE data format adapter
+│   │   ├── surge_metrics.py   # Official SurGE 8 metrics wrapper
+│   │   ├── benchmark_runner.py# Batch comparison vs 3 baselines
+│   │   ├── llm_judge.py       # 12-dim LLM-as-Judge scoring
+│   │   ├── hallucination_checker.py
+│   │   ├── full_eval.py       # One-click full evaluation
+│   │   └── metrics.py         # Core metrics (Recall/Precision/F1/ROUGE)
+│   │
 │   └── cli.py                 # CLI commands (Typer)
 │
 └── tests/
@@ -338,6 +348,31 @@ MARS/
     ├── test_new_components.py # Settings, LLM gateway, DB, API tests
     └── test_usage_features.py # End-to-end usage feature tests
 ```
+
+---
+
+## 📊 Benchmark Evaluation
+
+MARS is evaluated on the **[SurGE](https://github.com/oneal2000/SurGE)** benchmark (SIGIR 2026), a standardized evaluation framework for automated survey generation systems covering 205 computer science topics with ground-truth surveys and a 1.09M-paper corpus.
+
+**Benchmark workflow:**
+```bash
+# Run MARS in SurGE corpus mode + auto-evaluate
+mars full --mode surge --eval "federated learning"
+
+# Compare MARS against SurGE baselines (Autosurvey, ID, Naive)
+mars benchmark --action compare
+
+# Run full 41-topic evaluation
+mars benchmark --action all
+```
+
+See [`mars/evaluation/`](mars/evaluation/) for the complete evaluation module:
+- `surge_eval.py` — Citation Recall/Precision/F1 via doc_id matching
+- `surge_metrics.py` — Official SurGE 8 metrics (ROUGE, BLEU, SH-Recall, etc.)
+- `benchmark_runner.py` — Batch comparison against 3 baselines
+- `llm_judge.py` — 12-dimension LLM-as-Judge quality scoring
+- `hallucination_checker.py` — Citation fabrication detection
 
 ---
 

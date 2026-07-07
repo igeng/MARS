@@ -806,11 +806,19 @@ User input: "federated learning with differential privacy"
 | File | Test Content | Notes |
 |------|--------------|-------|
 | `tests/conftest.py` | Shared fixtures and mocks | Mocks external APIs, database, etc. |
-| `tests/test_basic.py` | Configuration, tools, Agent/Crew imports | ~46 tests |
-| `tests/test_new_components.py` | Settings, LLM Gateway, DB, API, Tasks | ~33 tests |
-| `tests/test_usage_features.py` | End-to-end usage features | ~26 tests |
+| `tests/test_basic.py` | Configuration, tools, Agent/Crew imports | ~20 tests |
+| `tests/test_new_components.py` | Settings, LLM Gateway, DB, API, Tasks | ~30 tests |
+| `tests/test_usage_features.py` | End-to-end usage features | ~25 tests |
+| `tests/test_gateway_and_crews.py` | LLM gateway + crew orchestration | ~20 tests |
+| `tests/test_evaluation.py` | SurGE evaluation metrics | ~22 tests |
 
-**Total: approximately 105 tests, all passable without real API keys.**
+**Total: 134 tests, all passable without real API keys.**
+
+### 14.3 SurGE Benchmark
+
+MARS is evaluated on **[SurGE](https://github.com/oneal2000/SurGE)** (SIGIR 2026),
+a standardized benchmark for automated survey generation with 205 CS topics
+and a 1.09M-paper corpus. See `mars/evaluation/` for the evaluation module.
 
 ### 14.2 Running Tests
 
