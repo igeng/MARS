@@ -27,10 +27,8 @@ dependencies = [
     "litellm>=1.50.0",
     # LangChain integrations
     "langchain-openai>=0.2.0",
-    # LLM SDKs
-    "dashscope>=1.20.0",         # Qwen (Alibaba Cloud)
-    "openai>=1.50.0",            # DeepSeek & Kimi use OpenAI-compatible API
-    "zhipuai>=2.1.0",            # GLM (Zhipu AI)
+    # LLM SDK
+    "openai>=1.50.0",            # DeepSeek OpenAI-compatible API
     # Academic search
     "semanticscholar>=0.8.0",    # Semantic Scholar
     "scholarly>=1.7.11",         # Google Scholar (unofficial)

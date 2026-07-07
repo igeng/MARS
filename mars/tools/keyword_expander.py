@@ -27,7 +27,7 @@ class KeywordExpanderTool(BaseTool):
         "Returns a list of expanded keywords."
     )
 
-    def _run(self, keyword: str, provider: str | None = None) -> str:
+    def _run(self, keyword: str) -> str:
         if not keyword:
             return "Error: 'keyword' parameter is required."
 
@@ -44,7 +44,7 @@ class KeywordExpanderTool(BaseTool):
         )
 
         try:
-            llm = get_llm(provider=provider)
+            llm = get_llm()
             response = llm.invoke(prompt)
             content = response.content if hasattr(response, "content") else str(response)
 

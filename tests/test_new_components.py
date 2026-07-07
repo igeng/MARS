@@ -85,10 +85,10 @@ class TestLLMGateway:
         with pytest.raises(ValueError, match="Unknown agent role"):
             get_llm_by_task("nonexistent_role")
 
-    def test_get_llm_invalid_provider(self) -> None:
+    def test_get_llm_returns_object(self) -> None:
         from mars.services.llm_gateway import get_llm
-        with pytest.raises(ValueError, match="Unknown LLM provider"):
-            get_llm(provider="openai")
+        llm = get_llm()
+        assert llm is not None
 
     def test_re_export_compatibility(self) -> None:
         """utils/llm_factory should re-export from services/llm_gateway."""

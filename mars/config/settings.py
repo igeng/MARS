@@ -19,25 +19,14 @@ class MarsSettings(BaseSettings):
 
     model_config = {"env_file": str(_ENV_PATH), "env_file_encoding": "utf-8"}
 
-    # ---- LLM Provider API keys ----
-    DASHSCOPE_API_KEY: str = ""
+    # ---- LLM Provider API key ----
     DEEPSEEK_API_KEY: str = ""
-    MOONSHOT_API_KEY: str = ""
-    ZHIPU_API_KEY: str = ""
 
-    # ---- Model identifiers ----
-    QWEN_MODEL: str = "glm-5.1"
-
+    # ---- Model identifier ----
     DEEPSEEK_MODEL: str = "deepseek-v4-flash"
-    DEEPSEEK_CODER_MODEL: str = "deepseek-coder"
 
-    KIMI_MODEL: str = "kimi-k2.5"
-
-    GLM_MODEL: str = "glm-4.7-flash"  # 免费模型，作为兜底
-
-    # ---- API endpoints ----
+    # ---- API endpoint ----
     DEEPSEEK_BASE_URL: str = "https://api.deepseek.com/v1"
-    MOONSHOT_BASE_URL: str = "https://api.moonshot.cn/v1"
 
     # ---- Academic search ----
     SEMANTIC_SCHOLAR_API_KEY: str = ""
@@ -51,7 +40,7 @@ class MarsSettings(BaseSettings):
     ARXIV_SEARCH_TIMEOUT: int = Field(default=30, gt=0)
 
     # ---- Application ----
-    DEFAULT_LLM_PROVIDER: str = "qwen"
+    DEFAULT_LLM_PROVIDER: str = "deepseek"
     LOG_LEVEL: str = "INFO"
     OUTPUT_DIR: Path = Path("./output")
     # Retrieval mode: "online" (DBLP/S2/arXiv APIs) or "surge" (SurGE corpus)
@@ -67,12 +56,6 @@ class MarsSettings(BaseSettings):
     # Quality threshold (0-10) for early stopping.  When the LLM-as-Judge
     # overall score reaches this value the refinement loop exits early.
     REFINEMENT_THRESHOLD: float = Field(default=7.0, ge=0.0, le=10.0)
-
-    # ---- GLM rate-limit handling ----
-    # Retry attempts on RateLimitError before switching to the next provider.
-    GLM_RATE_LIMIT_MAX_RETRIES: int = 3
-    # Base delay in seconds for exponential back-off (doubles each retry).
-    GLM_RATE_LIMIT_RETRY_DELAY: float = 5.0
 
     # ---- Crew memory ----
     # Set to True only when an OpenAI-compatible embedding API key is available.

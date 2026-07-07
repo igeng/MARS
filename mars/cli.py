@@ -817,10 +817,7 @@ def check_command() -> None:
 
     # --- LLM provider status ---
     provider_info = {
-        "qwen": ("DASHSCOPE_API_KEY", settings.DASHSCOPE_API_KEY),
         "deepseek": ("DEEPSEEK_API_KEY", settings.DEEPSEEK_API_KEY),
-        "kimi": ("MOONSHOT_API_KEY", settings.MOONSHOT_API_KEY),
-        "glm": ("ZHIPU_API_KEY", settings.ZHIPU_API_KEY),
     }
 
     table = Table(title="LLM 供应商状态")

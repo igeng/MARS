@@ -20,14 +20,11 @@ import pytest
 class TestSettings:
     def test_settings_importable(self) -> None:
         from mars.config import settings
-        assert hasattr(settings, "DASHSCOPE_API_KEY")
         assert hasattr(settings, "DEEPSEEK_API_KEY")
-        assert hasattr(settings, "MOONSHOT_API_KEY")
-        assert hasattr(settings, "ZHIPU_API_KEY")
 
     def test_default_llm_provider(self) -> None:
         from mars.config import settings
-        assert settings.DEFAULT_LLM_PROVIDER in ("qwen", "deepseek", "kimi", "glm")
+        assert settings.DEFAULT_LLM_PROVIDER == "deepseek"
 
     def test_max_papers_positive(self) -> None:
         from mars.config import settings
@@ -40,31 +37,9 @@ class TestSettings:
 # ---------------------------------------------------------------------------
 
 class TestLLMFactory:
-    def test_invalid_provider_raises(self) -> None:
-        from mars.utils.llm_factory import get_llm
-        with pytest.raises(ValueError, match="Unknown LLM provider"):
-            get_llm(provider="nonexistent_provider")
-
-    def test_get_llm_returns_object(self) -> None:
-        """get_llm should return an object without API calls."""
-        from mars.utils.llm_factory import get_llm
-        # This should not raise even with empty API key (no actual call is made)
-        llm = get_llm(provider="qwen")
-        assert llm is not None
-
     def test_get_deepseek_llm(self) -> None:
         from mars.utils.llm_factory import get_deepseek_llm
         llm = get_deepseek_llm()
-        assert llm is not None
-
-    def test_get_kimi_llm(self) -> None:
-        from mars.utils.llm_factory import get_kimi_llm
-        llm = get_kimi_llm()
-        assert llm is not None
-
-    def test_get_glm_llm(self) -> None:
-        from mars.utils.llm_factory import get_glm_llm
-        llm = get_glm_llm()
         assert llm is not None
 
 
