@@ -43,21 +43,39 @@ logger = logging.getLogger(__name__)
 
 
 def _build_analysis_crew(topic: str, corpus_mode: str | None = None) -> Crew:
-    """Build the analysis-phase crew (domain → search → deep → connect → evaluate)."""
+    """Build the analysis-phase crew.
+
+    In surge mode, skips deep_analysis/connection/evaluation since papers
+    come from the SurGE corpus and cannot be verified via arXiv/S2 APIs.
+    """
     max_papers = settings.MAX_PAPERS_PER_SEARCH
     analysis_limit = settings.MAX_PAPERS_FOR_ANALYSIS
 
-    mode = corpus_mode or settings.CORPUS_MODE
+    mode = (corpus_mode or settings.CORPUS_MODE).lower()
     researcher = create_researcher_agent()
     searcher = create_searcher_agent(corpus_mode=mode)
-    analyzer = create_analyzer_agent()
-    connector = create_connector_agent()
-    evaluator = create_evaluator_agent()
 
     domain_analysis_task = create_domain_analysis_task(researcher, topic)
     bulk_search_task = create_paper_search_task(
         searcher, topic, max_papers, context=[domain_analysis_task]
     )
+
+    if mode == "surge":
+        # Simplified: domain → search only
+        logger.info("Surge mode: skipping deep_analysis/connection/evaluation.")
+        return Crew(
+            agents=[researcher, searcher],
+            tasks=[domain_analysis_task, bulk_search_task],
+            process=Process.sequential,
+            verbose=True,
+            memory=settings.ENABLE_MEMORY,
+        )
+
+    # Full online mode
+    analyzer = create_analyzer_agent()
+    connector = create_connector_agent()
+    evaluator = create_evaluator_agent()
+
     deep_analysis_task = create_deep_analysis_task(
         analyzer, topic, limit=analysis_limit, context=[bulk_search_task]
     )
