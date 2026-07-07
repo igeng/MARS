@@ -351,16 +351,13 @@ pytest tests/ -v
 
 ---
 
-## 🌐 Supported LLM Providers
+## 🌐 LLM Provider
 
-| Provider | Models | API |
-|----------|--------|-----|
-| **Alibaba Cloud (Qwen)** | qwen3.5-flash, qwen-max, qwen-plus | DashScope (OpenAI-compatible) |
-| **DeepSeek** | deepseek-chat, deepseek-coder | DeepSeek Open API (OpenAI-compatible) |
-| **Moonshot AI (Kimi)** | kimi-k2.5, moonshot-v1-8k | Moonshot API (OpenAI-compatible) |
-| **Zhipu AI (GLM)** | glm-4.7-flash, glm-4-plus, glm-4-air | Zhipu Open Platform (OpenAI-compatible) |
+| Provider | Model | API |
+|----------|-------|-----|
+| **DeepSeek** | deepseek-v4-flash | DeepSeek OpenAI-compatible API |
 
-All providers are accessed via OpenAI-compatible APIs, making it easy to switch between them or add new providers.
+All six MARS agents use the same DeepSeek model.
 
 ---
 
