@@ -439,12 +439,12 @@ def get_llm(
 # Preferred providers are qwen and kimi; other providers fall back automatically
 # when those keys are absent.
 _AGENT_LLM_MAP: dict[str, tuple[str, str | None]] = {
-    "researcher": ("qwen", None),     # Qwen – strong reasoning
-    "searcher": ("qwen", None),       # Qwen – long-context search synthesis
-    "analyzer": ("qwen", None),       # Qwen – long-context deep analysis
-    "connector": ("qwen", None),      # Qwen – relation reasoning
-    "summarizer": ("qwen", None),     # Qwen – long text generation
-    "evaluator": ("kimi", None),      # Kimi – evaluation tasks
+    "researcher": ("qwen", None),     # Qwen (glm-5.1 via DashScope)
+    "searcher": ("qwen", None),       # Qwen (glm-5.1 via DashScope)
+    "analyzer": ("qwen", None),       # Qwen (glm-5.1 via DashScope)
+    "connector": ("qwen", None),      # Qwen (glm-5.1 via DashScope)
+    "summarizer": ("qwen", None),     # Qwen (glm-5.1 via DashScope)
+    "evaluator": ("qwen", None),      # Qwen (glm-5.1 via DashScope)
 }
 
 
