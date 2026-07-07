@@ -194,8 +194,10 @@ class SurgeCorpusSearchTool(BaseTool):
         pool_size = min(max(100, max_results * 5), n_papers)
         pool_indices = np.argsort(scores)[::-1][:pool_size]
 
-        # Stage 2: Embedding-based reranking (if embedder available)
-        embed_fn = _get_semantic_embedder()
+        # Stage 2: Embedding-based reranking (skip if env disables it)
+        embed_fn = None
+        if not os.environ.get("SURGE_SKIP_EMBEDDING"):
+            embed_fn = _get_semantic_embedder()
         if embed_fn is not None and pool_size > max_results:
             try:
                 top_indices = _rerank_by_embedding(
@@ -241,6 +243,8 @@ _semantic_model = None
 def _get_semantic_embedder():
     """Return a sentence-transformers model for reranking, or None."""
     global _semantic_model
+    if _semantic_model == "FAILED":
+        return None
     if _semantic_model is not None:
         return _semantic_model
     try:
@@ -248,10 +252,12 @@ def _get_semantic_embedder():
         _semantic_model = SentenceTransformer("all-MiniLM-L6-v2")
         logger.info("Semantic reranker loaded: all-MiniLM-L6-v2")
         return _semantic_model
-    except ImportError:
-        logger.debug("sentence-transformers not available — using TF-IDF only")
+    except (ImportError, OSError, RuntimeError, MemoryError) as exc:
+        _semantic_model = "FAILED"
+        logger.debug("Failed to load embedding model (will use TF-IDF only): %s", exc)
         return None
     except Exception as exc:
+        _semantic_model = "FAILED"
         logger.debug("Failed to load embedding model: %s", exc)
         return None
 
