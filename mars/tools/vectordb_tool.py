@@ -62,28 +62,29 @@ def _get_embed_fn():
     except Exception:
         pass
 
-    # Fallback: sentence-transformers (local, no API key needed)
-    try:
-        from sentence_transformers import SentenceTransformer
-        model = SentenceTransformer("all-MiniLM-L6-v2")
+    # Fallback: sentence-transformers (skip if env-flagged, segfaults on some Windows)
+    import os as _os
+    if not _os.environ.get("MARS_SKIP_LOCAL_EMBEDDING"):
+        try:
+            from sentence_transformers import SentenceTransformer
+            model = SentenceTransformer("all-MiniLM-L6-v2")
 
-        def _st_embed(texts: list[str]) -> list[list[float]]:
-            embeddings = model.encode(texts, show_progress_bar=False)
-            return embeddings.tolist()
+            def _st_embed(texts: list[str]) -> list[list[float]]:
+                embeddings = model.encode(texts, show_progress_bar=False)
+                return embeddings.tolist()
 
-        _EMBED_FN = _st_embed
-        logger.info("Using all-MiniLM-L6-v2 (local) for vector store.")
-        return _EMBED_FN
-    except Exception:
-        logger.warning(
-            "No embedding backend available. "
-            "Install sentence-transformers: pip install sentence-transformers"
-        )
-        # Return a dummy embedder that returns zero vectors
-        def _dummy(texts: list[str]) -> list[list[float]]:
-            return [[0.0] * 384 for _ in texts]
-        _EMBED_FN = _dummy
-        return _EMBED_FN
+            _EMBED_FN = _st_embed
+            logger.info("Using all-MiniLM-L6-v2 (local) for vector store.")
+            return _EMBED_FN
+        except Exception:
+            pass
+
+    # Dummy fallback: zero vectors (RAG disabled, but pipeline continues)
+    logger.warning("No embedding backend available — RAG indexing skipped.")
+    def _dummy(texts: list[str]) -> list[list[float]]:
+        return [[0.0] * 384 for _ in texts]
+    _EMBED_FN = _dummy
+    return _EMBED_FN
 
 
 # ---------------------------------------------------------------------------
