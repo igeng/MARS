@@ -26,9 +26,9 @@ class MarsSettings(BaseSettings):
     ZHIPU_API_KEY: str = ""
 
     # ---- Model identifiers ----
-    QWEN_MODEL: str = "glm-5.1"        # GLM-5.1 via 阿里百炼 DashScope
+    QWEN_MODEL: str = "glm-5.1"
 
-    DEEPSEEK_MODEL: str = "deepseek-chat"
+    DEEPSEEK_MODEL: str = "deepseek-v4-flash"
     DEEPSEEK_CODER_MODEL: str = "deepseek-coder"
 
     KIMI_MODEL: str = "kimi-k2.5"
