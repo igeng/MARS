@@ -661,20 +661,12 @@ notepad .env
 
 ```env
 # ============================================================
-# LLM 供应商 API Key（至少填写一个，推荐全部填写）
+# LLM API Key
 # ============================================================
-
-# 阿里云 Qwen（通义千问）
-# 获取地址：https://bailian.console.aliyun.com/ → API-KEY 管理
-DASHSCOPE_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
 # DeepSeek
 # 获取地址：https://platform.deepseek.com/ → API Keys
-DEEPSEEK_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-
-# 月之暗面 Kimi（Moonshot AI）
-# 获取地址：https://platform.moonshot.cn/ → API Key 管理
-MOONSHOT_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+DEEPSEEK_API_KEY=your_deepseek_api_key_here
 
 # 智谱 AI（GLM）
 # 获取地址：https://open.bigmodel.cn/ → API Key（格式为 xxx.yyy）

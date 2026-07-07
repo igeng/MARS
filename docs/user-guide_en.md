@@ -661,20 +661,12 @@ In the `.env` file that opens, fill in your API Keys. Below is the complete conf
 
 ```env
 # ============================================================
-# LLM Provider API Keys (fill in at least one; all recommended)
+# LLM API Key
 # ============================================================
-
-# Alibaba Cloud Qwen (Tongyi Qianwen)
-# Obtain at: https://bailian.console.aliyun.com/ → API-KEY Management
-DASHSCOPE_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
 # DeepSeek
 # Obtain at: https://platform.deepseek.com/ → API Keys
-DEEPSEEK_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-
-# Moonshot AI Kimi
-# Obtain at: https://platform.moonshot.cn/ → API Key Management
-MOONSHOT_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+DEEPSEEK_API_KEY=your_deepseek_api_key_here
 
 # Zhipu AI (GLM)
 # Obtain at: https://open.bigmodel.cn/ → API Key (format: xxx.yyy)
